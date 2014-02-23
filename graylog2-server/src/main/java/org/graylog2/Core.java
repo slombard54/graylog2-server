@@ -42,6 +42,7 @@ import org.graylog2.dashboards.DashboardRegistry;
 import org.graylog2.database.HostCounterCacheImpl;
 import org.graylog2.database.MongoBridge;
 import org.graylog2.database.MongoConnection;
+import org.graylog2.hystrix.eventstream.EventStreamServer;
 import org.graylog2.indexer.Deflector;
 import org.graylog2.indexer.IndexFailure;
 import org.graylog2.indexer.Indexer;
@@ -439,6 +440,10 @@ public class Core implements GraylogServer, InputHost {
             }
         });
         LOG.info("Started REST API at <{}>", configuration.getRestListenUri());
+
+        LOG.info("Starting Hystrix event stream.");
+        new Thread(new EventStreamServer()).start();
+        LOG.info("Started Hystrix event stream.");
     }
 
 

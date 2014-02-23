@@ -4,19 +4,12 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.Maps;
 import org.apache.commons.io.FileUtils;
 import org.elasticsearch.ElasticSearchTimeoutException;
-import org.elasticsearch.action.WriteConsistencyLevel;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
 import org.elasticsearch.action.admin.cluster.node.info.NodesInfoRequest;
 import org.elasticsearch.action.admin.cluster.node.info.NodesInfoResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
-import org.elasticsearch.action.bulk.BulkRequestBuilder;
-import org.elasticsearch.action.bulk.BulkResponse;
-import org.elasticsearch.action.index.IndexRequest.OpType;
-import org.elasticsearch.action.index.IndexRequestBuilder;
-import org.elasticsearch.action.support.replication.ReplicationType;
 import org.elasticsearch.client.Client;
 import org.elasticsearch.common.settings.loader.YamlSettingsLoader;
-import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.node.NodeBuilder;
 import org.graylog2.Configuration;
@@ -38,7 +31,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicLong;
 
 import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.elasticsearch.node.NodeBuilder.nodeBuilder;
@@ -204,38 +196,7 @@ public class Indexer {
     }
 
     public boolean bulkIndex(final List<Message> messages) {
-        if (messages.isEmpty()) {
-            return true;
-        }
-
-        final BulkRequestBuilder request = client.prepareBulk();
-        for (Message msg : messages) {
-            request.add(buildIndexRequest(Deflector.DEFLECTOR_NAME, msg.toElasticSearchObject(), msg.getId())); // Main index.
-        }
-
-        request.setConsistencyLevel(WriteConsistencyLevel.ONE);
-        request.setReplicationType(ReplicationType.ASYNC);
-        
-        final BulkResponse response = client.bulk(request.request()).actionGet();
-        
-        LOG.debug("Deflector index: Bulk indexed {} messages, took {} ms, failures: {}",
-                new Object[] { response.getItems().length, response.getTookInMillis(), response.hasFailures() });
-
-        if (response.hasFailures()) {
-            propagateFailure(response.getItems());
-        }
-
-        return !response.hasFailures();
-    }
-
-    private void propagateFailure(BulkItemResponse[] items) {
-        LOG.error("Failed to index [{}] messages. Please check the index error log in your web interface for the reason.", items.length);
-
-        boolean r = this.failureQueue.offer(items);
-
-        if(!r) {
-            LOG.debug("Could not propagate failure to failure queue. Queue is full.");
-        }
+        return new BatchIndexCommand(client, messages, failureQueue).execute();
     }
 
     public Searches searches() {
@@ -260,20 +221,6 @@ public class Indexer {
 
     public LinkedBlockingQueue<BulkItemResponse[]> getFailureQueue() {
         return failureQueue;
-    }
-
-    private IndexRequestBuilder buildIndexRequest(String index, Map<String, Object> source, String id) {
-        final IndexRequestBuilder b = new IndexRequestBuilder(client);
-
-        b.setId(id);
-        b.setSource(source);
-        b.setIndex(index);
-        b.setContentType(XContentType.JSON);
-        b.setOpType(OpType.INDEX);
-        b.setType(TYPE);
-        b.setConsistencyLevel(WriteConsistencyLevel.ONE);
-
-        return b;
     }
 
 }
