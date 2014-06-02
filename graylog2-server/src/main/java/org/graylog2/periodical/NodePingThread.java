@@ -82,7 +82,7 @@ public class NodePingThread extends Periodical {
                 boolean removedNotification = notificationService.fixed(notification);
                 if (removedNotification) {
                     activityWriter.write(
-                        new Activity("Notification condition [" + NotificationImpl.Type.NO_MASTER + "] " +
+                        new Activity("Notification condition [" + Notification.Type.NO_MASTER + "] " +
                                              "has been fixed.", NodePingThread.class));
                 }
             } else {

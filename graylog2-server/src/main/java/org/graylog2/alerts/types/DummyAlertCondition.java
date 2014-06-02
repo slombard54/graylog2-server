@@ -26,6 +26,7 @@ import org.graylog2.plugin.Tools;
 import org.graylog2.plugin.streams.Stream;
 import org.joda.time.DateTime;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -51,6 +52,6 @@ public class DummyAlertCondition extends AbstractAlertCondition {
 
     @Override
     public List<Message> getSearchHits() {
-        return null;
+        return new ArrayList<>();
     }
 }

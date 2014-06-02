@@ -56,21 +56,26 @@ public class NotificationServiceImpl extends PersistedServiceImpl implements Not
     }
 
     @Override
-    public boolean fixed(NotificationImpl.Type type) {
-        return fixed(type, null);
+    public boolean fixed(Notification.Type type) {
+        return fixed(type, (String)null);
     }
 
     @Override
-    public boolean fixed(NotificationImpl.Type type, Node node) {
+    public boolean fixed(Notification.Type type, Node node) {
+        return fixed(type, node.getNodeId());
+    }
+
+    @Override
+    public boolean fixed(Notification.Type type, String nodeId) {
         BasicDBObject qry = new BasicDBObject();
         qry.put("type", type.toString().toLowerCase());
-        if (node != null)
-            qry.put("node_id", node.getNodeId());
+        if (nodeId != null)
+            qry.put("node_id", nodeId);
         return destroyAll(NotificationImpl.class, qry) > 0;
     }
 
     @Override
-    public boolean isFirst(NotificationImpl.Type type) {
+    public boolean isFirst(Notification.Type type) {
         return (findOne(NotificationImpl.class, new BasicDBObject("type", type.toString().toLowerCase())) == null);
     }
 
@@ -123,7 +128,7 @@ public class NotificationServiceImpl extends PersistedServiceImpl implements Not
 
     @Override
     public boolean fixed(Notification notification) {
-        return fixed(notification.getType(), null);
+        return fixed(notification.getType());
     }
 
     @Override

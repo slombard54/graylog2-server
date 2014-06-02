@@ -47,25 +47,16 @@ public class AlertScannerThread extends Periodical {
     private final Logger LOG = LoggerFactory.getLogger(AlertScannerThread.class);
     private AlertService alertService;
     private final StreamService streamService;
-    private final AlarmCallbackConfigurationService alarmCallbackConfigurationService;
-    private final AlarmCallbackFactory alarmCallbackFactory;
-    private final EmailAlarmCallback emailAlarmCallback;
     private final IndexerSetupService indexerSetupService;
     private final Indexer indexer;
 
     @Inject
     public AlertScannerThread(AlertService alertService,
                               StreamService streamService,
-                              AlarmCallbackConfigurationService alarmCallbackConfigurationService,
-                              AlarmCallbackFactory alarmCallbackFactory,
-                              EmailAlarmCallback emailAlarmCallback,
                               IndexerSetupService indexerSetupService,
                               Indexer indexer) {
         this.alertService = alertService;
         this.streamService = streamService;
-        this.alarmCallbackConfigurationService = alarmCallbackConfigurationService;
-        this.alarmCallbackFactory = alarmCallbackFactory;
-        this.emailAlarmCallback = emailAlarmCallback;
         this.indexerSetupService = indexerSetupService;
         this.indexer = indexer;
     }
@@ -97,18 +88,9 @@ public class AlertScannerThread extends Periodical {
                         // Persist alert.
                         Alert alert = alertService.factory(result);
                         alertService.save(alert);
-
-                        List<AlarmCallbackConfiguration> callConfigurations = alarmCallbackConfigurationService.getForStream(stream);
-                        if (callConfigurations.size() > 0)
-                            for (AlarmCallbackConfiguration configuration : callConfigurations) {
-                                AlarmCallback alarmCallback = alarmCallbackFactory.create(configuration);
-                                alarmCallback.call(stream, result);
-                            }
-                        else
-                            emailAlarmCallback.call(stream, result);
                     } else {
                         // Alert not triggered.
-                        LOG.debug("Alert condition [{}] is triggered.", alertCondition);
+                        LOG.debug("Alert condition [{}] is not triggered.", alertCondition);
                     }
                 } catch(Exception e) {
                     LOG.error("Skipping alert check that threw an exception.", e);

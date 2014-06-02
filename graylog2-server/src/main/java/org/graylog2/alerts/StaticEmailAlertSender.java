@@ -66,11 +66,6 @@ public class StaticEmailAlertSender implements AlertSender {
     public void initialize(org.graylog2.plugin.configuration.Configuration configuration) {
     }
 
-    @Override
-    public void sendEmails(Stream stream, AlertCondition.CheckResult checkResult) throws TransportConfigurationException, EmailException {
-        sendEmails(stream, checkResult, null);
-    }
-
     private void sendEmail(String emailAddress, Stream stream, AlertCondition.CheckResult checkResult, List<Message> backlog) throws TransportConfigurationException, EmailException {
         LOG.debug("Sending mail to " + emailAddress);
         if(!configuration.isEmailTransportEnabled()) {

@@ -9,6 +9,8 @@ import org.graylog2.alarmcallbacks.AlarmCallbackConfigurationService;
 import org.graylog2.alarmcallbacks.AlarmCallbackFactory;
 import org.graylog2.alarmcallbacks.EmailAlarmCallback;
 import org.graylog2.alerts.AbstractAlertCondition;
+import org.graylog2.alerts.Alert;
+import org.graylog2.alerts.AlertService;
 import org.graylog2.alerts.types.DummyAlertCondition;
 import org.graylog2.indexer.Indexer;
 import org.graylog2.plugin.Tools;
@@ -44,18 +46,21 @@ public class StreamAlertReceiverResource extends RestResource {
     private final EmailAlarmCallback emailAlarmCallback;
     private final AlarmCallbackFactory alarmCallbackFactory;
     private final Indexer indexer;
+    private final AlertService alertService;
 
     @Inject
     public StreamAlertReceiverResource(StreamService streamService,
                                        AlarmCallbackConfigurationService alarmCallbackConfigurationService,
                                        EmailAlarmCallback emailAlarmCallback,
                                        AlarmCallbackFactory alarmCallbackFactory,
-                                       Indexer indexer) {
+                                       Indexer indexer,
+                                       AlertService alertService) {
         this.streamService = streamService;
         this.alarmCallbackConfigurationService = alarmCallbackConfigurationService;
         this.emailAlarmCallback = emailAlarmCallback;
         this.alarmCallbackFactory = alarmCallbackFactory;
         this.indexer = indexer;
+        this.alertService = alertService;
     }
 
     @POST
@@ -150,20 +155,8 @@ public class StreamAlertReceiverResource extends RestResource {
         Map<String, Object> parameters = Maps.newHashMap();
         DummyAlertCondition dummyAlertCondition = new DummyAlertCondition(stream, null, Tools.iso8601(), getSubject().getPrincipal().toString(), parameters);
 
-        try {
-            AbstractAlertCondition.CheckResult checkResult = dummyAlertCondition.runCheck(indexer);
-            List<AlarmCallbackConfiguration> callConfigurations = alarmCallbackConfigurationService.getForStream(stream);
-            if (callConfigurations.size() > 0)
-                for (AlarmCallbackConfiguration configuration : callConfigurations) {
-                    AlarmCallback alarmCallback = alarmCallbackFactory.create(configuration);
-                    alarmCallback.call(stream, checkResult);
-                }
-            else
-                emailAlarmCallback.call(stream, checkResult);
-
-        } catch (AlarmCallbackException | ClassNotFoundException | AlarmCallbackConfigurationException e) {
-            return Response.serverError().entity(e.getMessage()).build();
-        }
+        AbstractAlertCondition.CheckResult checkResult = dummyAlertCondition.runCheck(indexer);
+        Alert alert = alertService.factory(checkResult);
 
         return Response.status(Response.Status.NO_CONTENT).build();
     }

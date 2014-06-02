@@ -21,6 +21,7 @@ package org.graylog2.alarmcallbacks;
 
 import com.google.common.collect.Lists;
 import com.google.inject.Inject;
+import org.apache.commons.mail.EmailException;
 import org.graylog2.alerts.AlertSender;
 import org.graylog2.alerts.FormattedEmailAlertSender;
 import org.graylog2.notifications.Notification;
@@ -41,6 +42,7 @@ import org.graylog2.plugin.system.NodeId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -68,38 +70,39 @@ public class EmailAlarmCallback implements AlarmCallback {
         AlertCondition alertCondition = result.getTriggeredCondition();
         if (stream.getAlertReceivers().size() > 0) {
             try {
-                if (alertCondition.getBacklog() > 0 && alertCondition.getSearchHits() != null) {
-                    List<Message> backlog = Lists.newArrayList();
+                List<Message> backlog = Lists.newArrayList();
 
+                if (alertCondition.getBacklog() > 0 && alertCondition.getSearchHits() != null) {
                     for (Message searchHit : alertCondition.getSearchHits()) {
                         backlog.add(searchHit);
                     }
 
                     // Read as many messages as possible (max: backlog size) from backlog.
+                    // TODO: I think this is not doing anything. (do)
                     int readTo = alertCondition.getBacklog();
                     if(backlog.size() < readTo) {
                         readTo = backlog.size();
                     }
-                    alertSender.sendEmails(stream, result, backlog.subList(0, readTo));
-                } else {
-                    alertSender.sendEmails(stream, result);
+                    backlog = backlog.subList(0, readTo);
                 }
-            } catch (TransportConfigurationException e) {
-                Notification notification = notificationService.buildNow()
-                        .addNode(nodeId.toString())
-                        .addType(NotificationImpl.Type.EMAIL_TRANSPORT_CONFIGURATION_INVALID)
-                        .addDetail("stream_id", stream.getId())
-                        .addDetail("exception", e);
-                notificationService.publishIfFirst(notification);
-                LOG.warn("Stream [{}] has alert receivers and is triggered, but email transport is not configured.", stream);
+
+                alertSender.sendEmails(stream, result, backlog);
+                notificationService.fixed(Notification.Type.EMAIL_TRANSPORT_CONFIGURATION_INVALID, nodeId.toString());
+                notificationService.fixed(Notification.Type.EMAIL_TRANSPORT_FAILED, nodeId.toString());
             } catch (Exception e) {
                 Notification notification = notificationService.buildNow()
                         .addNode(nodeId.toString())
-                        .addType(NotificationImpl.Type.EMAIL_TRANSPORT_FAILED)
+                        .addSeverity(Notification.Severity.URGENT)
                         .addDetail("stream_id", stream.getId())
-                        .addDetail("exception", e);
+                        .addDetail("exception", e.toString());
+
+                if (e instanceof TransportConfigurationException)
+                    notification.addType(Notification.Type.EMAIL_TRANSPORT_CONFIGURATION_INVALID);
+                else
+                    notification.addType(Notification.Type.EMAIL_TRANSPORT_FAILED);
+
                 notificationService.publishIfFirst(notification);
-                LOG.error("Stream [{}] has alert receivers and is triggered, but sending emails failed", stream, e);
+                LOG.warn("Stream [{}] has alert receivers and is triggered, but email transport is not or improperly configured.", stream);
             }
         }
     }

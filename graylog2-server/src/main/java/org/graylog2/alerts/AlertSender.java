@@ -34,7 +34,5 @@ import java.util.List;
 public interface AlertSender {
     void initialize(Configuration configuration);
 
-    void sendEmails(Stream stream, AlertCondition.CheckResult checkResult) throws TransportConfigurationException, EmailException;
-
     void sendEmails(Stream stream, AlertCondition.CheckResult checkResult, List<Message> backlog) throws TransportConfigurationException, EmailException;
 }

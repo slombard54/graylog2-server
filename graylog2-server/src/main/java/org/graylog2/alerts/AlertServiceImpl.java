@@ -34,6 +34,8 @@ import org.graylog2.plugin.Tools;
 import org.graylog2.plugin.alarms.AlertCondition;
 import org.graylog2.plugin.streams.Stream;
 import org.graylog2.rest.resources.streams.alerts.requests.CreateConditionRequest;
+import org.graylog2.shared.internalevents.InternalEventHandler;
+import org.graylog2.shared.internalevents.StreamAlertTriggeredEvent;
 import org.joda.time.DateTime;
 import org.joda.time.Seconds;
 import org.slf4j.Logger;
@@ -46,10 +48,12 @@ import java.util.Map;
 
 public class AlertServiceImpl extends PersistedServiceImpl implements AlertService {
     private static final Logger LOG = LoggerFactory.getLogger(AlertServiceImpl.class);
+    private final InternalEventHandler internalEventHandler;
 
     @Inject
-    public AlertServiceImpl(MongoConnection mongoConnection) {
+    public AlertServiceImpl(MongoConnection mongoConnection, InternalEventHandler internalEventHandler) {
         super(mongoConnection);
+        this.internalEventHandler = internalEventHandler;
     }
 
     @Override
@@ -60,11 +64,15 @@ public class AlertServiceImpl extends PersistedServiceImpl implements AlertServi
             throw new RuntimeException("Tried to create alert from not triggered alert condition result.");
         }
 
+        AlertCondition alertCondition = checkResult.getTriggeredCondition();
         fields.put("triggered_at", checkResult.getTriggeredAt());
-        fields.put("condition_id", checkResult.getTriggeredCondition().getId());
-        fields.put("stream_id", checkResult.getTriggeredCondition().getStream().getId());
+        fields.put("condition_id", alertCondition.getId());
+        fields.put("stream_id", alertCondition.getStream().getId());
         fields.put("description", checkResult.getResultDescription());
-        fields.put("condition_parameters", checkResult.getTriggeredCondition().getParameters());
+        fields.put("condition_parameters", alertCondition.getParameters());
+
+        StreamAlertTriggeredEvent event = new StreamAlertTriggeredEvent(checkResult);
+        internalEventHandler.submit(event);
 
         return new AlertImpl(fields);
     }

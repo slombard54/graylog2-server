@@ -48,12 +48,6 @@ public class StreamServiceImpl extends PersistedServiceImpl implements StreamSer
     private final StreamRuleService streamRuleService;
     private final AlertService alertService;
 
-    public StreamServiceImpl(MongoConnection mongoConnection) {
-        this(mongoConnection,
-                new StreamRuleServiceImpl(mongoConnection),
-                new AlertServiceImpl(mongoConnection));
-    }
-
     @Inject
     public StreamServiceImpl(MongoConnection mongoConnection, StreamRuleService streamRuleService, AlertService alertService) {
         super(mongoConnection);

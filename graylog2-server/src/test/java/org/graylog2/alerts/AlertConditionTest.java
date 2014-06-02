@@ -26,6 +26,7 @@ import org.graylog2.indexer.searches.Searches;
 import org.graylog2.plugin.Tools;
 import org.graylog2.plugin.alarms.AlertCondition;
 import org.graylog2.plugin.streams.Stream;
+import org.graylog2.shared.internalevents.InternalEventHandler;
 import org.joda.time.DateTime;
 import org.testng.annotations.BeforeClass;
 
@@ -44,6 +45,7 @@ public class AlertConditionTest {
     protected Searches searches;
     protected AlertService alertService;
     protected MongoConnection mongoConnection;
+    protected InternalEventHandler internalEventHandler;
 
     protected final String STREAM_ID = "STREAMMOCKID";
     protected final String STREAM_CREATOR = "MOCKUSER";
@@ -55,7 +57,9 @@ public class AlertConditionTest {
         indexer = mock(Indexer.class);
         searches = mock(Searches.class);
         mongoConnection = mock(MongoConnection.class);
-        alertService = new AlertServiceImpl(mongoConnection);
+        internalEventHandler = mock(InternalEventHandler.class);
+
+        alertService = new AlertServiceImpl(mongoConnection, internalEventHandler);
 
         when(stream.getId()).thenReturn(STREAM_ID);
         when(indexer.searches()).thenReturn(searches);

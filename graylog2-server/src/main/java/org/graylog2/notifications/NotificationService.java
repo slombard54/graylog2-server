@@ -36,6 +36,8 @@ public interface NotificationService extends PersistedService {
 
     boolean fixed(Notification.Type type, Node node);
 
+    boolean fixed(Notification.Type type, String nodeId);
+
     boolean isFirst(Notification.Type type);
 
     List<Notification> all();

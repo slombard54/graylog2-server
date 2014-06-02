@@ -64,12 +64,8 @@ public class StreamRouter {
     private final Boolean useCaching;
 
     @Inject
-    public StreamRouter(MongoConnection mongoConnection, MetricRegistry metricRegistry) {
-        this(true, mongoConnection, metricRegistry);
-    }
-
-    public StreamRouter(Boolean useCaching, MongoConnection mongoConnection, MetricRegistry metricRegistry) {
-        this(useCaching, new StreamServiceImpl(mongoConnection), new StreamRuleServiceImpl(mongoConnection), metricRegistry);
+    public StreamRouter(StreamService streamService, StreamRuleService streamRuleService, MetricRegistry metricRegistry) {
+        this(true, streamService, streamRuleService, metricRegistry);
     }
 
     public StreamRouter(boolean useCaching, StreamService streamService, StreamRuleService streamRuleService, MetricRegistry metricRegistry) {

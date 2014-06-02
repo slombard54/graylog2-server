@@ -148,5 +148,4 @@ public class NotificationImpl extends PersistedImpl implements Notification {
     public Map<String, Validator> getEmbeddedValidations(String key) {
         return Maps.newHashMap();
     }
-
 }
