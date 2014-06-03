@@ -58,6 +58,18 @@ public abstract class BaseConfiguration {
     @Parameter(value = "plugin_dir", required = false)
     private String pluginDir = "plugin";
 
+    @Parameter(value = "event_bus_initial_pool_size", required = false)
+    private int eventBusInitialPoolSize = 4;
+
+    @Parameter(value = "event_bus_max_pool_size", required = false)
+    private int eventBusMaxPoolSize = 20;
+
+    @Parameter(value = "event_bus_max_queue_size", required = false)
+    private int eventBusMaxQueueSize = 1000;
+
+    @Parameter(value = "event_bus_pool_keepalive", required = false)
+    private int eventBusPoolKeepalive = 60;
+
     public URI getRestTransportUri() {
         if (restTransportUri == null || restTransportUri.isEmpty()) {
             return null;
@@ -114,6 +126,22 @@ public abstract class BaseConfiguration {
 
     public String getPluginDir() {
         return pluginDir;
+    }
+
+    public int getEventBusInitialPoolSize() {
+        return eventBusInitialPoolSize;
+    }
+
+    public int getEventBusMaxPoolSize() {
+        return eventBusMaxPoolSize;
+    }
+
+    public int getEventBusMaxQueueSize() {
+        return eventBusMaxQueueSize;
+    }
+
+    public int getEventBusPoolKeepalive() {
+        return eventBusPoolKeepalive;
     }
 
     public abstract String getNodeIdFile();
