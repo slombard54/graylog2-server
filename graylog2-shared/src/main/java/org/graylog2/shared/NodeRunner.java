@@ -25,6 +25,7 @@ package org.graylog2.shared;
 import com.google.common.collect.Lists;
 import com.google.inject.AbstractModule;
 import com.google.inject.Module;
+import org.apache.logging.log4j.core.util.Constants;
 import org.graylog2.plugin.Tools;
 import org.graylog2.shared.bindings.GenericBindings;
 import org.graylog2.shared.bindings.InstantiationService;
@@ -42,7 +43,12 @@ import java.util.Arrays;
 import java.util.List;
 
 public class NodeRunner {
-    private static final Logger LOG = LoggerFactory.getLogger(NodeRunner.class);
+    private static final Logger LOG;
+
+    static {
+        System.setProperty(Constants.LOG4J_CONTEXT_SELECTOR, org.apache.logging.log4j.core.async.AsyncLoggerContextSelector.class.getCanonicalName());
+        LOG = LoggerFactory.getLogger(NodeRunner.class);
+    }
 
     protected static List<Module> getBindingsModules(InstantiationService instantiationService, Module... specificModules) {
         List<Module> result = Lists.newArrayList();
