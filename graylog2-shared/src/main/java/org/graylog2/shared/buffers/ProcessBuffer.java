@@ -1,22 +1,25 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
+/**
+ * The MIT License
+ * Copyright (c) 2012 TORCH GmbH
  *
- * This file is part of Graylog2.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * Graylog2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * Graylog2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
-
 package org.graylog2.shared.buffers;
 
 import com.codahale.metrics.Meter;
@@ -29,6 +32,7 @@ import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import org.graylog2.inputs.Cache;
 import org.graylog2.inputs.InputCache;
+import org.graylog2.plugin.BaseConfiguration;
 import org.graylog2.plugin.Message;
 import org.graylog2.plugin.buffers.Buffer;
 import org.graylog2.plugin.buffers.BufferOutOfCapacityException;
@@ -51,7 +55,7 @@ import static com.codahale.metrics.MetricRegistry.name;
  */
 public class ProcessBuffer extends Buffer {
     public interface Factory {
-        public ProcessBuffer create(InputCache masterCache, AtomicInteger processBufferWatermark);
+        public ProcessBuffer create(InputCache inputCache, AtomicInteger processBufferWatermark);
     }
 
     private static final Logger LOG = LoggerFactory.getLogger(ProcessBuffer.class);
@@ -65,24 +69,25 @@ public class ProcessBuffer extends Buffer {
                 .build()
     );
 
-    private final InputCache masterCache;
+    private final BaseConfiguration configuration;
+    private final InputCache inputCache;
     private final AtomicInteger processBufferWatermark;
 
     private final Meter incomingMessages;
     private final Meter rejectedMessages;
     private final Meter cachedMessages;
 
-    private final MetricRegistry metricRegistry;
     private final ServerStatus serverStatus;
 
     @AssistedInject
     public ProcessBuffer(MetricRegistry metricRegistry,
                          ServerStatus serverStatus,
-                         @Assisted InputCache masterCache,
+                         BaseConfiguration configuration,
+                         @Assisted InputCache inputCache,
                          @Assisted AtomicInteger processBufferWatermark) {
-        this.metricRegistry = metricRegistry;
         this.serverStatus = serverStatus;
-        this.masterCache = masterCache;
+        this.configuration = configuration;
+        this.inputCache = inputCache;
         this.processBufferWatermark = processBufferWatermark;
 
         incomingMessages = metricRegistry.meter(name(ProcessBuffer.class, "incomingMessages"));
@@ -98,8 +103,8 @@ public class ProcessBuffer extends Buffer {
         }
     }
 
-    public Cache getMasterCache() {
-        return masterCache;
+    public Cache getInputCache() {
+        return inputCache;
     }
 
     public void initialize(ProcessBufferProcessor[] processors, int ringBufferSize, WaitStrategy waitStrategy, int processBufferProcessors) {
@@ -124,20 +129,34 @@ public class ProcessBuffer extends Buffer {
     public void insertCached(Message message, MessageInput sourceInput) {
         message.setSourceInput(sourceInput);
 
-        message.addField(SOURCE_INPUT_ATTR_NAME, sourceInput.getPersistId());
+        final String source_input_name;
+
+        if (sourceInput != null)
+            source_input_name = sourceInput.getId();
+        else
+            source_input_name = "<nonexistent input>";
+
+        message.addField(SOURCE_INPUT_ATTR_NAME, source_input_name);
         message.addField(SOURCE_NODE_ATTR_NAME, serverStatus.getNodeId());
 
         if (!serverStatus.isProcessing()) {
             LOG.debug("Message processing is paused. Writing to cache.");
             cachedMessages.mark();
-            masterCache.add(message);
+            inputCache.add(message);
             return;
         }
 
         if (!hasCapacity()) {
-            LOG.debug("Out of capacity. Writing to cache.");
-            cachedMessages.mark();
-            masterCache.add(message);
+            if (configuration.getInputCacheMaxSize() == 0 || inputCache.size() < configuration.getInputCacheMaxSize()) {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("Out of capacity. Writing to cache.");
+                cachedMessages.mark();
+                inputCache.add(message);
+            } else {
+                if (LOG.isDebugEnabled())
+                    LOG.debug("Out of capacity. Input cache limit reached. Dropping message.");
+                rejectedMessages.mark();
+            }
             return;
         }
 
@@ -148,7 +167,14 @@ public class ProcessBuffer extends Buffer {
     public void insertFailFast(Message message, MessageInput sourceInput) throws BufferOutOfCapacityException, ProcessingDisabledException {
         message.setSourceInput(sourceInput);
 
-        message.addField(SOURCE_INPUT_ATTR_NAME, sourceInput.getId());
+        final String source_input_name;
+
+        if (sourceInput != null)
+            source_input_name = sourceInput.getId();
+        else
+            source_input_name = "<nonexistent input>";
+
+        message.addField(SOURCE_INPUT_ATTR_NAME, source_input_name);
         message.addField(SOURCE_NODE_ATTR_NAME, serverStatus.getNodeId());
 
         if (!serverStatus.isProcessing()) {

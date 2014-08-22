@@ -1,6 +1,4 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
- *
+/**
  * This file is part of Graylog2.
  *
  * Graylog2 is free software: you can redistribute it and/or modify
@@ -16,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.graylog2.indexer;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -29,10 +26,12 @@ import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.ListenableFuture;
 import com.ning.http.client.Response;
 import org.apache.commons.io.FileUtils;
+import org.elasticsearch.ElasticSearchException;
 import org.elasticsearch.ElasticSearchTimeoutException;
 import org.elasticsearch.Version;
 import org.elasticsearch.action.WriteConsistencyLevel;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
+import org.elasticsearch.action.admin.cluster.health.ClusterHealthStatus;
 import org.elasticsearch.action.admin.cluster.node.info.NodesInfoRequest;
 import org.elasticsearch.action.admin.cluster.node.info.NodesInfoResponse;
 import org.elasticsearch.action.bulk.BulkItemResponse;
@@ -372,6 +371,23 @@ public class Indexer {
 
     public Indices indices() {
         return indices;
+    }
+
+    /**
+     * Check if the Elasticsearch {@link Node} is connected and that the cluster health status
+     * is not {@link ClusterHealthStatus#RED}.
+     *
+     * @return {@code true} if the Elasticsearch client is up and the cluster is healthy, {@code false} otherwise
+     */
+    public boolean isConnectedAndHealthy() {
+        try {
+            return !node.isClosed()
+                    && cluster() != null
+                    && cluster().getHealth() != ClusterHealthStatus.RED;
+        } catch (ElasticSearchException e) {
+            LOG.trace("Couldn't determine Elasticsearch health properly", e);
+            return false;
+        }
     }
 
     public LinkedBlockingQueue<List<DeadLetter>> getDeadLetterQueue() {

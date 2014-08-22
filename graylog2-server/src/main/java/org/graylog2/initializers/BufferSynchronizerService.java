@@ -1,6 +1,4 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
- *
+/**
  * This file is part of Graylog2.
  *
  * Graylog2 is free software: you can redistribute it and/or modify
@@ -16,34 +14,35 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.graylog2.initializers;
 
 import com.google.common.util.concurrent.AbstractIdleService;
 import org.graylog2.buffers.Buffers;
 import org.graylog2.caches.Caches;
+import org.graylog2.indexer.Indexer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import javax.inject.Singleton;
 
-/**
- * @author Dennis Oelkers <dennis@torch.sh>
- */
 @Singleton
 public class BufferSynchronizerService extends AbstractIdleService {
     private static final Logger LOG = LoggerFactory.getLogger(BufferSynchronizerService.class);
 
     private final Buffers bufferSynchronizer;
     private final Caches cacheSynchronizer;
+    private final Indexer indexer;
 
     private volatile boolean indexerAvailable = true;
 
     @Inject
-    public BufferSynchronizerService(Buffers bufferSynchronizer, Caches cacheSynchronizer) {
+    public BufferSynchronizerService(final Buffers bufferSynchronizer,
+                                     final Caches cacheSynchronizer,
+                                     final Indexer indexer) {
         this.bufferSynchronizer = bufferSynchronizer;
         this.cacheSynchronizer = cacheSynchronizer;
+        this.indexer = indexer;
     }
 
     @Override
@@ -53,11 +52,11 @@ public class BufferSynchronizerService extends AbstractIdleService {
     @Override
     protected void shutDown() throws Exception {
         LOG.debug("Stopping BufferSynchronizerService");
-        if (indexerAvailable) {
+        if (indexerAvailable && indexer.isConnectedAndHealthy()) {
             bufferSynchronizer.waitForEmptyBuffers();
             cacheSynchronizer.waitForEmptyCaches();
         } else {
-            LOG.warn("Indexer is unavailable, not waiting to clear buffers and caches, as we have no connection to Elasticsearch");
+            LOG.warn("Elasticsearch is unavailable. Not waiting to clear buffers and caches, as we have no healthy cluster.");
         }
         LOG.debug("Stopped BufferSynchronizerService");
     }

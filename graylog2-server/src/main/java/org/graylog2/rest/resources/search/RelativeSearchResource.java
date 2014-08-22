@@ -1,6 +1,4 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
- *
+/**
  * This file is part of Graylog2.
  *
  * Graylog2 is free software: you can redistribute it and/or modify
@@ -80,18 +78,19 @@ public class RelativeSearchResource extends SearchResource {
         final List<String> fieldList = parseOptionalFields(fields);
         Sorting sorting = buildSorting(sort);
 
+        TimeRange timeRange = buildRelativeTimeRange(range);
         final SearchesConfig searchesConfig = SearchesConfigBuilder.newConfig()
                 .setQuery(query)
                 .setFilter(filter)
                 .setFields(fieldList)
-                .setRange(buildRelativeTimeRange(range))
+                .setRange(timeRange)
                 .setLimit(limit)
                 .setOffset(offset)
                 .setSorting(sorting)
                 .build();
 
         try {
-            return buildSearchResponse(indexer.searches().search(searchesConfig));
+            return buildSearchResponse(indexer.searches().search(searchesConfig), timeRange);
         } catch (SearchPhaseExecutionException e) {
             throw createRequestExceptionForParseFailure(query, e);
         }

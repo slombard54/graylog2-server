@@ -1,6 +1,4 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
- *
+/**
  * This file is part of Graylog2.
  *
  * Graylog2 is free software: you can redistribute it and/or modify
@@ -16,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.graylog2.radio.bindings;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -80,7 +77,7 @@ public class RadioBindings extends AbstractModule {
         capabilityBinder.addBinding().toInstance(ServerStatus.Capability.RADIO);
 
         bind(ServerStatus.class).in(Scopes.SINGLETON);
-        bind(InputRegistry.class).toProvider(RadioInputRegistryProvider.class);
+        bind(InputRegistry.class).toProvider(RadioInputRegistryProvider.class).asEagerSingleton();
 
         bind(URI.class).annotatedWith(Names.named("ServerUri")).toInstance(configuration.getGraylog2ServerUri());
         bind(URI.class).annotatedWith(Names.named("OurRadioUri")).toInstance(configuration.getRestTransportUri());

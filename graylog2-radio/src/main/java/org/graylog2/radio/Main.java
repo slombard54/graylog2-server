@@ -1,6 +1,4 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
- *
+/**
  * This file is part of Graylog2.
  *
  * Graylog2 is free software: you can redistribute it and/or modify
@@ -16,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.graylog2.radio;
 
 import com.beust.jcommander.JCommander;
@@ -33,19 +30,18 @@ import com.github.joschi.jadconfig.repositories.SystemPropertiesRepository;
 import com.google.common.collect.Lists;
 import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.util.concurrent.ServiceManager;
-import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Module;
 import org.apache.log4j.Level;
 import org.graylog2.plugin.Plugin;
 import org.graylog2.plugin.PluginModule;
+import org.graylog2.plugin.ServerStatus;
 import org.graylog2.plugin.Tools;
-import org.graylog2.plugin.lifecycles.Lifecycle;
 import org.graylog2.radio.bindings.RadioBindings;
 import org.graylog2.radio.bindings.RadioInitializerBindings;
 import org.graylog2.radio.cluster.Ping;
 import org.graylog2.shared.NodeRunner;
-import org.graylog2.plugin.ServerStatus;
+import org.graylog2.shared.bindings.GuiceInjectorHolder;
 import org.graylog2.shared.bindings.GuiceInstantiationService;
 import org.graylog2.shared.initializers.ServiceManagerListener;
 import org.graylog2.shared.plugins.PluginLoader;
@@ -125,7 +121,7 @@ public class Main extends NodeRunner {
                 new RadioInitializerBindings());
         LOG.debug("Adding plugin modules: " + pluginModules);
         bindingsModules.addAll(pluginModules);
-        Injector injector = Guice.createInjector(bindingsModules);
+        final Injector injector = GuiceInjectorHolder.createInjector(bindingsModules);
         instantiationService.setInjector(injector);
 
         // This is holding all our metrics.
@@ -151,11 +147,8 @@ public class Main extends NodeRunner {
             savePidFile(commandLineArguments.getPidFile());
         }
 
-        ServerStatus serverStatus = injector.getInstance(ServerStatus.class);
-
-        monkeyPatchHK2(injector);
-
-        serverStatus.setLifecycle(Lifecycle.STARTING);
+        final ServerStatus serverStatus = injector.getInstance(ServerStatus.class);
+        serverStatus.initialize();
 
         // register node by initiating first ping. if the node isn't registered, loading persisted inputs will fail silently, for example
         Ping.Pinger pinger = injector.getInstance(Ping.Pinger.class);

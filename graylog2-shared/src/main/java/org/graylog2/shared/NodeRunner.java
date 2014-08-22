@@ -1,35 +1,34 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
+/**
+ * The MIT License
+ * Copyright (c) 2012 TORCH GmbH
  *
- * This file is part of Graylog2.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * Graylog2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * Graylog2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
-
 package org.graylog2.shared;
 
 import com.google.common.collect.Lists;
 import com.google.inject.AbstractModule;
-import com.google.inject.Injector;
 import com.google.inject.Module;
 import org.apache.commons.io.IOUtils;
-import org.glassfish.hk2.extension.ServiceLocatorGenerator;
-import org.glassfish.jersey.internal.inject.Injections;
 import org.graylog2.plugin.Tools;
 import org.graylog2.shared.bindings.GenericBindings;
 import org.graylog2.shared.bindings.InstantiationService;
-import org.graylog2.shared.bindings.OwnServiceLocatorGenerator;
 import org.reflections.Reflections;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,9 +37,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
-import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Modifier;
 import java.util.Arrays;
 import java.util.List;
 
@@ -72,26 +69,6 @@ public class NodeRunner {
 
         result.addAll(Arrays.asList(specificModules));
         return result;
-    }
-
-    protected static void monkeyPatchHK2(Injector injector) {
-        ServiceLocatorGenerator ownGenerator = new OwnServiceLocatorGenerator(injector);
-        try {
-            Field field = Injections.class.getDeclaredField("generator");
-            field.setAccessible(true);
-            Field modifiers = Field.class.getDeclaredField("modifiers");
-            modifiers.setAccessible(true);
-            modifiers.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-
-            field.set(null, ownGenerator);
-        } catch (NoSuchFieldException | IllegalAccessException e) {
-            LOG.error("Monkey patching Jersey's HK2 failed: ", e);
-            System.exit(-1);
-        }
-
-        /*ServiceLocatorFactory factory = ServiceLocatorFactory.getInstance();
-        factory.addListener(new HK2ServiceLocatorListener(injector));*/
-
     }
 
     protected static void savePidFile(String pidFile) {

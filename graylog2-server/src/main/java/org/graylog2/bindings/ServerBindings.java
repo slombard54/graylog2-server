@@ -1,6 +1,4 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
- *
+/**
  * This file is part of Graylog2.
  *
  * Graylog2 is free software: you can redistribute it and/or modify
@@ -16,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.graylog2.bindings;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -36,7 +33,6 @@ import org.graylog2.bindings.providers.*;
 import org.graylog2.buffers.OutputBufferWatermark;
 import org.graylog2.buffers.processors.OutputBufferProcessor;
 import org.graylog2.buffers.processors.ServerProcessBufferProcessor;
-import org.graylog2.caches.DiskJournalCache;
 import org.graylog2.database.MongoConnection;
 import org.graylog2.filters.FilterService;
 import org.graylog2.filters.FilterServiceImpl;
@@ -54,8 +50,10 @@ import org.graylog2.inputs.BasicCache;
 import org.graylog2.inputs.InputCache;
 import org.graylog2.inputs.OutputCache;
 import org.graylog2.jersey.container.netty.SecurityContextFactory;
+import org.graylog2.plugin.BaseConfiguration;
 import org.graylog2.plugin.PluginMetaData;
 import org.graylog2.plugin.RulesEngine;
+import org.graylog2.plugin.ServerStatus;
 import org.graylog2.plugin.indexer.MessageGateway;
 import org.graylog2.rest.NotFoundExceptionMapper;
 import org.graylog2.rest.RestAccessLogFilter;
@@ -63,10 +61,9 @@ import org.graylog2.rest.ValidationExceptionMapper;
 import org.graylog2.security.ShiroSecurityBinding;
 import org.graylog2.security.ShiroSecurityContextFactory;
 import org.graylog2.security.ldap.LdapConnector;
+import org.graylog2.security.ldap.LdapSettingsImpl;
 import org.graylog2.security.realm.LdapUserAuthenticator;
-import org.graylog2.plugin.BaseConfiguration;
-import org.graylog2.plugin.ServerStatus;
-import org.graylog2.shared.bindings.AsyncHttpClientProvider;
+import org.graylog2.shared.bindings.providers.AsyncHttpClientProvider;
 import org.graylog2.shared.inputs.InputRegistry;
 import org.graylog2.shared.metrics.jersey2.MetricsDynamicBinding;
 import org.graylog2.streams.StreamRouter;
@@ -115,6 +112,7 @@ public class ServerBindings extends AbstractModule {
         install(new FactoryModuleBuilder().build(Indices.Factory.class));
         install(new FactoryModuleBuilder().build(FixDeflectorByDeleteJob.Factory.class));
         install(new FactoryModuleBuilder().build(FixDeflectorByMoveJob.Factory.class));
+        install(new FactoryModuleBuilder().build(LdapSettingsImpl.Factory.class));
     }
 
     private void bindSingletons() {
@@ -133,7 +131,7 @@ public class ServerBindings extends AbstractModule {
         bind(OutputBufferWatermark.class).toInstance(new OutputBufferWatermark());
         bind(Indexer.class).toProvider(IndexerProvider.class);
         bind(SystemJobManager.class).toProvider(SystemJobManagerProvider.class);
-        bind(InputRegistry.class).toProvider(ServerInputRegistryProvider.class);
+        bind(InputRegistry.class).toProvider(ServerInputRegistryProvider.class).asEagerSingleton();
         bind(RulesEngine.class).toProvider(RulesEngineProvider.class);
         bind(LdapConnector.class).toProvider(LdapConnectorProvider.class);
         bind(LdapUserAuthenticator.class).toProvider(LdapUserAuthenticatorProvider.class);

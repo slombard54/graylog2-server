@@ -1,6 +1,4 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
- *
+/**
  * This file is part of Graylog2.
  *
  * Graylog2 is free software: you can redistribute it and/or modify
@@ -18,6 +16,9 @@
  */
 package org.graylog2.radio.transports.amqp;
 
+import com.codahale.metrics.Meter;
+import com.codahale.metrics.MetricRegistry;
+import com.codahale.metrics.Timer;
 import org.graylog2.plugin.Message;
 import org.graylog2.radio.Configuration;
 import org.graylog2.radio.transports.RadioTransport;
@@ -26,6 +27,8 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.io.IOException;
+
+import static com.codahale.metrics.MetricRegistry.name;
 
 /**
  * @author Lennart Koopmann <lennart@torch.sh>
@@ -39,9 +42,14 @@ public class AMQPProducer implements RadioTransport {
     public final static String ROUTING_KEY = "graylog2-radio-message";
 
     private final AMQPSender sender;
+    private final MetricRegistry metricRegistry;
+    private final Meter incomingMessages;
+    private final Meter rejectedMessages;
+    private final Timer processTime;
 
     @Inject
-    public AMQPProducer(Configuration configuration) {
+    public AMQPProducer(Configuration configuration, MetricRegistry metricRegistry) {
+        this.metricRegistry = metricRegistry;
         sender = new AMQPSender(
                 configuration.getAmqpHostname(),
                 configuration.getAmqpPort(),
@@ -49,14 +57,19 @@ public class AMQPProducer implements RadioTransport {
                 configuration.getAmqpUsername(),
                 configuration.getAmqpPassword()
         );
+        incomingMessages = metricRegistry.meter(name(AMQPProducer.class, "incomingMessages"));
+        rejectedMessages = metricRegistry.meter(name(AMQPProducer.class, "rejectedMessages"));
+        processTime = metricRegistry.timer(name(AMQPProducer.class, "processTime"));
     }
 
     @Override
     public void send(Message msg) {
-        try {
+        try (Timer.Context context = processTime.time()) {
+            incomingMessages.mark();
             sender.send(msg);
         } catch (IOException e) {
             LOG.error("Could not write to AMQP.", e);
+            rejectedMessages.mark();
         }
     }
 

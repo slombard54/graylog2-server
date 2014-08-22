@@ -1,6 +1,4 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
- *
+/**
  * This file is part of Graylog2.
  *
  * Graylog2 is free software: you can redistribute it and/or modify
@@ -16,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.graylog2.rest.resources.system.ldap;
 
 import com.codahale.metrics.annotation.Timed;
@@ -63,6 +60,9 @@ public class LdapResource extends RestResource {
 
     @Inject
     private LdapSettingsService ldapSettingsService;
+
+    @Inject
+    private LdapSettingsImpl.Factory ldapSettingsFactory;
 
     @Inject
     private LdapConnector ldapConnector;
@@ -193,7 +193,7 @@ public class LdapResource extends RestResource {
         // load the existing config, or create a new one. we only support having one, currently
         LdapSettings ldapSettings = ldapSettingsService.load();
         if (ldapSettings == null) {
-            ldapSettings = new LdapSettingsImpl();
+            ldapSettings = ldapSettingsFactory.createEmpty();
         }
         ldapSettings.setSystemUsername(request.systemUsername);
         ldapSettings.setSystemPassword(request.systemPassword);

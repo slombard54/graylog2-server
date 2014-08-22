@@ -1,6 +1,4 @@
-/*
- * Copyright 2012-2014 TORCH GmbH
- *
+/**
  * This file is part of Graylog2.
  *
  * Graylog2 is free software: you can redistribute it and/or modify
@@ -16,7 +14,6 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
  */
-
 package org.graylog2.utilities;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
@@ -27,10 +24,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.fasterxml.jackson.datatype.joda.JodaModule;
+import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.collect.Lists;
+import org.graylog2.database.NotFoundException;
 import org.graylog2.inputs.Input;
 import org.graylog2.inputs.InputService;
 import org.graylog2.plugin.Message;
@@ -60,7 +59,7 @@ public class MessageToJsonSerializer {
     private final StreamService streamService;
     private final InputService inputService;
     private final LoadingCache<String, Stream> streamCache;
-    private final LoadingCache<String, MessageInput> messageInputCache;
+    private final LoadingCache<String, Optional<MessageInput>> messageInputCache;
 
     private static class SerializeBean {
         private final Message message;
@@ -162,21 +161,15 @@ public class MessageToJsonSerializer {
         this.messageInputCache = CacheBuilder.newBuilder()
                 .expireAfterAccess(1, TimeUnit.SECONDS)
                 .build(
-                        new CacheLoader<String, MessageInput>() {
+                        new CacheLoader<String, Optional<MessageInput>>() {
                             @Override
-                            public MessageInput load(String key) throws Exception {
+                            public Optional<MessageInput> load(String key) throws Exception {
                                 LOG.debug("Loading message input {}", key);
-                                final Input input = inputService.find(key);
-
-                                if (input != null) {
-                                    try {
-                                        // TODO This might create lots of MessageInput instances. Can we avoid this?
-                                        return inputService.buildMessageInput(input);
-                                    } catch (NoSuchInputTypeException e) {
-                                        return null;
-                                    }
-                                } else {
-                                    return null;
+                                try {
+                                    final Input input = inputService.find(key);
+                                    return Optional.fromNullable(inputService.buildMessageInput(input));
+                                } catch (NotFoundException | NoSuchInputTypeException e) {
+                                    return Optional.absent();
                                 }
                             }
                         }
@@ -214,7 +207,11 @@ public class MessageToJsonSerializer {
 
         message.setStreams(streamList);
 
-        final MessageInput input = getMessageInput(bean.getSourceInput());
+        final MessageInput input;
+        if (bean.getSourceInput() != null)
+            input = getMessageInput(bean.getSourceInput());
+        else
+            input = null;
 
         if (input != null) {
             message.setSourceInput(input);
@@ -238,7 +235,8 @@ public class MessageToJsonSerializer {
 
     private MessageInput getMessageInput(String id) {
         try {
-            return messageInputCache.get(id);
+            final Optional<MessageInput> cacheResult = messageInputCache.get(id);
+            return cacheResult.orNull();
         } catch (ExecutionException e) {
             LOG.error("Message input cache error", e);
             return null;
