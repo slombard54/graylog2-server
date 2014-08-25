@@ -21,6 +21,7 @@ package org.graylog2.shared.journal;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
+import kafka.common.OffsetOutOfRangeException;
 import kafka.common.TopicAndPartition;
 import kafka.log.CleanerConfig;
 import kafka.log.Log;
@@ -45,6 +46,7 @@ import scala.collection.Map$;
 import java.io.File;
 import java.nio.ByteBuffer;
 import java.util.Collections;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 
 @Singleton
@@ -53,6 +55,7 @@ public class KafkaJournal {
 
     private final LogManager logManager;
     private final Log kafkaLog;
+    private final Semaphore messagesInJournal = new Semaphore(0);
 
     public static final NoCompressionCodec$ NO_COMPRESSION_CODEC = NoCompressionCodec$.MODULE$;
 
@@ -110,7 +113,22 @@ public class KafkaJournal {
             kafkaLog = messageLog.get();
         }
         log.info("initialized kafka based journal at {}", spoolDir);
+
+        final Thread thread = new Thread() {
+            @Override
+            public void run() {
+                while (true) {
+                    final RawMessage message = read();
+                    if (message != null) {
+                        log.info("Read message {}", message);
+                    }
+                }
+            }
+        };
+        thread.setDaemon(true);
+        thread.start();
     }
+
 
     public void write(RawMessage rawMessage) {
 
@@ -128,24 +146,42 @@ public class KafkaJournal {
                 new ByteBufferMessageSet(JavaConversions.asScalaBuffer(
                                                  Collections.<kafka.message.Message>singletonList(kafkaMessage)));
         final Log.LogAppendInfo appendInfo = kafkaLog.append(messageSet, true);
+        messagesInJournal.release();
         log.info("journalled message: {} bytes, log position {}", bytes.length, appendInfo.firstOffset());
     }
 
     public RawMessage read() {
-        final MessageSet messageSet = kafkaLog.read(readOffset, 10 * 1024, Option.<Object>apply(readOffset + 1));
-
-        final Iterator<MessageAndOffset> iterator = messageSet.iterator();
-        while (iterator.hasNext()) {
-            final MessageAndOffset messageAndOffset = iterator.next();
-            final ByteBuffer payload = messageAndOffset.message().payload();
-            final RawMessage rawMessage = RawMessage.decode(ChannelBuffers.wrappedBuffer(payload));
-
-            // TODO now lookup the payload type parser and convert rawMessage to Message
-            // then insert into
-
+        MessageSet messageSet = null;
+        while (messageSet == null || messageSet.isEmpty()) {
+            try {
+                messageSet = kafkaLog.read(readOffset, 10 * 1024, Option.<Object>apply(readOffset + 1));
+                if (messageSet.isEmpty()) {
+                    log.info("No more messages to read, blocking.");
+                    messagesInJournal.acquireUninterruptibly();
+                } else {
+                    // mark that we've taken a message
+                    log.info("More messages arrived, reading.");
+                    messagesInJournal.drainPermits();
+                }
+            } catch (OffsetOutOfRangeException e) {
+                // there are no more messages to read from the log, we need to wait until new ones are available;
+                messagesInJournal.acquireUninterruptibly();
+                log.info("woken up");
+            }
         }
 
-        return null;
+        final Iterator<MessageAndOffset> iterator = messageSet.iterator();
+        if (!(iterator.hasNext())) return null;
+
+        final MessageAndOffset messageAndOffset = iterator.next();
+        readOffset = messageAndOffset.nextOffset();
+        final ByteBuffer payload = messageAndOffset.message().payload();
+        log.info("Read message sequence number {}", messageAndOffset.offset());
+        return RawMessage.decode(ChannelBuffers.wrappedBuffer(payload));
+
+        // TODO now lookup the payload type parser and convert rawMessage to Message
+        // then insert into
+
     }
 
 
