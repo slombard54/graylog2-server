@@ -24,6 +24,7 @@ package org.graylog2.shared.bindings.providers;
 
 import com.codahale.metrics.MetricRegistry;
 import org.graylog2.inputs.gelf.gelf.GELFChunkManager;
+import org.graylog2.shared.buffers.JournalBuffer;
 import org.graylog2.shared.buffers.ProcessBuffer;
 
 import javax.inject.Inject;
@@ -37,9 +38,10 @@ public class GELFChunkManagerProvider implements Provider<GELFChunkManager> {
 
     @Inject
     public GELFChunkManagerProvider(MetricRegistry metricRegistry,
-                                    ProcessBuffer processBuffer) {
+                                    ProcessBuffer processBuffer,
+                                    JournalBuffer journalBuffer) {
         if (gelfChunkManager == null) {
-            gelfChunkManager = new GELFChunkManager(metricRegistry, processBuffer);
+            gelfChunkManager = new GELFChunkManager(metricRegistry, processBuffer, journalBuffer);
             gelfChunkManager.setName("gelf-chunk-manager");
         }
     }

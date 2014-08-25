@@ -52,9 +52,9 @@ public class GELFDispatcher extends SimpleChannelHandler {
     public GELFDispatcher(MetricRegistry metricRegistry,
                           GELFChunkManager gelfChunkManager,
                           Buffer processBuffer,
-                          MessageInput sourceInput) {
+                          Buffer journalBuffer, MessageInput sourceInput) {
         this.gelfChunkManager = gelfChunkManager;
-        this.processor = new GELFProcessor(metricRegistry, processBuffer);
+        this.processor = new GELFProcessor(metricRegistry, processBuffer, journalBuffer);
         this.sourceInput = sourceInput;
 
         this.receivedMessages = metricRegistry.meter(name(GELFDispatcher.class, "receivedMessages"));

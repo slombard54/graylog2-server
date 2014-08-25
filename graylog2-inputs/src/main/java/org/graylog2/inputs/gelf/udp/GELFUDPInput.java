@@ -73,7 +73,7 @@ public class GELFUDPInput extends GELFInputBase {
 
         bootstrap = new ConnectionlessBootstrap(new NioDatagramChannelFactory(workerThreadPool));
         bootstrap.setOption("receiveBufferSizePredictorFactory", new FixedReceiveBufferSizePredictorFactory(8192));
-        bootstrap.setPipelineFactory(new GELFUDPPipelineFactory(metricRegistry, gelfChunkManager, processBuffer, this, throughputCounter));
+        bootstrap.setPipelineFactory(new GELFUDPPipelineFactory(metricRegistry, gelfChunkManager, processBuffer, journalBuffer, this, throughputCounter));
         bootstrap.setOption("receiveBufferSize", getRecvBufferSize());
 
         try {

@@ -36,17 +36,19 @@ public class GELFUDPPipelineFactory implements ChannelPipelineFactory {
     private final MetricRegistry metricRegistry;
     private final GELFChunkManager gelfChunkManager;
     private final Buffer processBuffer;
+    private final Buffer journalBuffer;
     private final MessageInput sourceInput;
     private final ThroughputCounter throughputCounter;
 
     public GELFUDPPipelineFactory(MetricRegistry metricRegistry,
                                   GELFChunkManager gelfChunkManager,
                                   Buffer processBuffer,
-                                  MessageInput sourceInput,
+                                  Buffer journalBuffer, MessageInput sourceInput,
                                   ThroughputCounter throughputCounter) {
         this.metricRegistry = metricRegistry;
         this.gelfChunkManager = gelfChunkManager;
         this.processBuffer = processBuffer;
+        this.journalBuffer = journalBuffer;
         this.sourceInput = sourceInput;
         this.throughputCounter = throughputCounter;
     }
@@ -56,7 +58,8 @@ public class GELFUDPPipelineFactory implements ChannelPipelineFactory {
         ChannelPipeline p = Channels.pipeline();
         p.addLast("packet-meta-dumper", new PacketInformationDumper(sourceInput));
         p.addLast("traffic-counter", throughputCounter);
-        p.addLast("handler", new GELFDispatcher(metricRegistry, gelfChunkManager, processBuffer, sourceInput));
+        p.addLast("handler", new GELFDispatcher(metricRegistry, gelfChunkManager, processBuffer,
+                                                journalBuffer, sourceInput));
 
         return p;
     }

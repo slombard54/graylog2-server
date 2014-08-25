@@ -24,6 +24,7 @@ import com.google.inject.Scopes;
 import com.google.inject.TypeLiteral;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
 import com.google.inject.multibindings.Multibinder;
+import com.google.inject.name.Names;
 import com.ning.http.client.AsyncHttpClient;
 import org.apache.shiro.mgt.DefaultSecurityManager;
 import org.graylog2.Configuration;
@@ -54,6 +55,7 @@ import org.graylog2.plugin.BaseConfiguration;
 import org.graylog2.plugin.PluginMetaData;
 import org.graylog2.plugin.RulesEngine;
 import org.graylog2.plugin.ServerStatus;
+import org.graylog2.plugin.buffers.Buffer;
 import org.graylog2.plugin.indexer.MessageGateway;
 import org.graylog2.rest.NotFoundExceptionMapper;
 import org.graylog2.rest.RestAccessLogFilter;
@@ -64,6 +66,7 @@ import org.graylog2.security.ldap.LdapConnector;
 import org.graylog2.security.ldap.LdapSettingsImpl;
 import org.graylog2.security.realm.LdapUserAuthenticator;
 import org.graylog2.shared.bindings.providers.AsyncHttpClientProvider;
+import org.graylog2.shared.buffers.JournalBuffer;
 import org.graylog2.shared.inputs.InputRegistry;
 import org.graylog2.shared.metrics.jersey2.MetricsDynamicBinding;
 import org.graylog2.streams.StreamRouter;
@@ -147,6 +150,8 @@ public class ServerBindings extends AbstractModule {
             bind(InputCache.class).to(BasicCache.class).in(Scopes.SINGLETON);
             bind(OutputCache.class).to(BasicCache.class).in(Scopes.SINGLETON);
         }
+
+        bind(String.class).annotatedWith(Names.named("spoolDirectory")).toInstance(configuration.getMessageCacheSpoolDir());
     }
 
     private void bindInterfaces() {
@@ -155,6 +160,7 @@ public class ServerBindings extends AbstractModule {
         bind(AlertSender.class).to(FormattedEmailAlertSender.class);
         bind(StreamRouter.class);
         bind(FilterService.class).to(FilterServiceImpl.class).in(Scopes.SINGLETON);
+        bind(Buffer.class).annotatedWith(Names.named("journal")).to(JournalBuffer.class);
     }
 
     private void bindDynamicFeatures() {

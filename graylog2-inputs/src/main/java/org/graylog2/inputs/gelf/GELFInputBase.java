@@ -16,6 +16,7 @@
  */
 package org.graylog2.inputs.gelf;
 
+import com.google.inject.name.Named;
 import org.graylog2.plugin.buffers.Buffer;
 import org.graylog2.plugin.configuration.Configuration;
 import org.graylog2.plugin.configuration.ConfigurationException;
@@ -46,6 +47,10 @@ public abstract class GELFInputBase extends MessageInput {
     protected ThroughputCounter throughputCounter;
     @Inject
     protected ConnectionCounter connectionCounter;
+
+    @Inject
+    @Named("journal")
+    protected Buffer journalBuffer;
 
     protected InetSocketAddress socketAddress;
 

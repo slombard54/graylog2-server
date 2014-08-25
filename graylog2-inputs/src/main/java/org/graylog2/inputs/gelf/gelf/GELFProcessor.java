@@ -22,6 +22,8 @@ import org.graylog2.plugin.buffers.Buffer;
 import org.graylog2.plugin.buffers.BufferOutOfCapacityException;
 import org.graylog2.plugin.buffers.ProcessingDisabledException;
 import org.graylog2.plugin.inputs.MessageInput;
+import org.graylog2.plugin.journal.RawMessage;
+import org.jboss.netty.buffer.ChannelBuffers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -37,22 +39,30 @@ public class GELFProcessor {
 
     private MetricRegistry metricRegistry;
 
+    private final Buffer journalBuffer;
     private final GELFParser gelfParser;
 
-    public GELFProcessor(MetricRegistry metricRegistry, Buffer processBuffer) {
-        this(metricRegistry, processBuffer, new GELFParser(metricRegistry));
+    public GELFProcessor(MetricRegistry metricRegistry, Buffer processBuffer, Buffer journalBuffer) {
+        this(metricRegistry, processBuffer, journalBuffer, new GELFParser(metricRegistry));
     }
 
-    public GELFProcessor(MetricRegistry metricRegistry, Buffer processBuffer, GELFParser gelfParser) {
+    public GELFProcessor(MetricRegistry metricRegistry, Buffer processBuffer, Buffer journalBuffer, GELFParser gelfParser) {
         this.processBuffer = processBuffer;
         this.metricRegistry = metricRegistry;
+        this.journalBuffer = journalBuffer;
         this.gelfParser = gelfParser;
     }
 
     public void messageReceived(GELFMessage message, MessageInput sourceInput) throws BufferOutOfCapacityException {
-        Message lm = prepareMessage(message, sourceInput);
-        if (lm == null) return;
-        processBuffer.insertCached(lm, sourceInput);
+        final RawMessage rawMessage = new RawMessage("gelf",
+                                                     sourceInput.getUniqueReadableId(),
+                                                     null,
+                                                     ChannelBuffers.copiedBuffer(message.getPayload()));
+        journalBuffer.insertRaw(rawMessage);
+
+//        Message lm = prepareMessage(message, sourceInput);
+//        if (lm == null) return;
+//        processBuffer.insertCached(lm, sourceInput);
     }
 
     public void messageReceivedFailFast(GELFMessage message, MessageInput sourceInput) throws BufferOutOfCapacityException, ProcessingDisabledException {

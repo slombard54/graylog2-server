@@ -27,6 +27,7 @@ import com.codahale.metrics.MetricRegistry;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import com.google.inject.assistedinject.Assisted;
 import com.google.inject.assistedinject.AssistedInject;
+import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.WaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
@@ -192,13 +193,20 @@ public class ProcessBuffer extends Buffer {
     }
     
     private void insert(Message message) {
-        long sequence = ringBuffer.next();
-        MessageEvent event = ringBuffer.get(sequence);
+        long sequence = getRingBuffer().next();
+        MessageEvent event = getRingBuffer().get(sequence);
         event.setMessage(message);
-        ringBuffer.publish(sequence);
+        getRingBuffer().publish(sequence);
 
         this.processBufferWatermark.incrementAndGet();
         incomingMessages.mark();
     }
+
+    private RingBuffer<MessageEvent> ringBuffer;
+
+    public RingBuffer<MessageEvent> getRingBuffer() {
+        return ringBuffer;
+    }
+
 
 }

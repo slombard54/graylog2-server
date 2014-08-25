@@ -40,6 +40,7 @@ public class GELFProcessorTest {
     @Mock GELFMessage gelfMessage;
     @Mock MessageInput messageInput;
     @Mock Buffer processBuffer;
+    @Mock Buffer journalBuffer;
     @Mock MetricRegistry metricRegistry;
     @Mock GELFParser gelfParser;
     @Mock Message message;
@@ -60,7 +61,7 @@ public class GELFProcessorTest {
     }
 
     public void testMessageReceived() throws Exception {
-        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, gelfParser);
+        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, journalBuffer, gelfParser);
 
         gelfProcessor.messageReceived(gelfMessage, messageInput);
 
@@ -68,7 +69,7 @@ public class GELFProcessorTest {
     }
 
     public void testMessageReceivedFailFast() throws Exception {
-        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, gelfParser);
+        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, journalBuffer, gelfParser);
 
         gelfProcessor.messageReceivedFailFast(gelfMessage, messageInput);
 
@@ -76,7 +77,7 @@ public class GELFProcessorTest {
     }
 
     public void testMessageReceivedIncompleteMessage() throws Exception {
-        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, gelfParser);
+        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, journalBuffer, gelfParser);
         when(message.isComplete()).thenReturn(false);
 
         gelfProcessor.messageReceived(gelfMessage, messageInput);
@@ -85,7 +86,7 @@ public class GELFProcessorTest {
     }
 
     public void testMessageReceivedFailFastIncompleteMessage() throws Exception {
-        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, gelfParser);
+        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, journalBuffer, gelfParser);
         when(message.isComplete()).thenReturn(false);
 
         gelfProcessor.messageReceivedFailFast(gelfMessage, messageInput);
@@ -94,7 +95,7 @@ public class GELFProcessorTest {
     }
 
     public void testMessageReceivedCorruptMessage() throws Exception {
-        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, gelfParser);
+        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, journalBuffer, gelfParser);
         when(gelfParser.parse(anyString(), eq(messageInput))).thenThrow(new IllegalStateException());
 
         gelfProcessor.messageReceived(gelfMessage, messageInput);
@@ -103,7 +104,7 @@ public class GELFProcessorTest {
     }
 
     public void testMessageReceivedFailFastCorruptMessage() throws Exception {
-        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, gelfParser);
+        GELFProcessor gelfProcessor = new GELFProcessor(metricRegistry, processBuffer, journalBuffer, gelfParser);
         when(gelfParser.parse(anyString(), eq(messageInput))).thenThrow(new IllegalStateException());
 
         gelfProcessor.messageReceivedFailFast(gelfMessage, messageInput);

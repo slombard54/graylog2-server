@@ -37,17 +37,19 @@ public class GELFHttpPipelineFactory implements ChannelPipelineFactory {
     private final MessageInput sourceInput;
     private final ThroughputCounter throughputCounter;
     private final ConnectionCounter connectionCounter;
+    private final Buffer journalBuffer;
 
     public GELFHttpPipelineFactory(MetricRegistry metricRegistry,
                                    Buffer processBuffer,
                                    MessageInput sourceInput,
                                    ThroughputCounter throughputCounter,
-                                   ConnectionCounter connectionCounter) {
+                                   ConnectionCounter connectionCounter, Buffer journalBuffer) {
         this.metricRegistry = metricRegistry;
         this.processBuffer = processBuffer;
         this.sourceInput = sourceInput;
         this.throughputCounter = throughputCounter;
         this.connectionCounter = connectionCounter;
+        this.journalBuffer = journalBuffer;
     }
 
     @Override
@@ -65,7 +67,7 @@ public class GELFHttpPipelineFactory implements ChannelPipelineFactory {
 
         pipeline.addLast("handler", new GELFHttpHandler(metricRegistry,
                 sourceInput,
-                new GELFProcessor(metricRegistry, processBuffer),
+                new GELFProcessor(metricRegistry, processBuffer, journalBuffer),
                 sourceInput.getConfiguration().getBoolean("enable_cors"))
         );
 

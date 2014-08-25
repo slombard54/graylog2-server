@@ -76,7 +76,7 @@ public class GELFHttpInput extends GELFInputBase {
         bootstrap = new ServerBootstrap(
                 new NioServerSocketChannelFactory(bossExecutor, workerExecutor)
         );
-        bootstrap.setPipelineFactory(new GELFHttpPipelineFactory(metricRegistry, processBuffer, this, throughputCounter, connectionCounter));
+        bootstrap.setPipelineFactory(new GELFHttpPipelineFactory(metricRegistry, processBuffer, this, throughputCounter, connectionCounter, journalBuffer));
 
         try {
             channel = ((ServerBootstrap) bootstrap).bind(socketAddress);

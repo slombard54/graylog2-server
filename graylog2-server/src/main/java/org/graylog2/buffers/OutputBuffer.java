@@ -19,6 +19,7 @@ package org.graylog2.buffers;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
+import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import org.graylog2.Configuration;
@@ -63,6 +64,7 @@ public class OutputBuffer extends Buffer {
     private final Meter cachedMessages;
 
     private final OutputBufferProcessor.Factory outputBufferProcessorFactory;
+    private RingBuffer<MessageEvent> ringBuffer;
 
     @Inject
     public OutputBuffer(OutputBufferProcessor.Factory outputBufferProcessorFactory,
@@ -85,7 +87,7 @@ public class OutputBuffer extends Buffer {
     }
 
     public void initialize() {
-        Disruptor disruptor = new Disruptor<MessageEvent>(
+        Disruptor<MessageEvent> disruptor = new Disruptor<>(
                 MessageEvent.EVENT_FACTORY,
                 configuration.getRingSize(),
                 executor,
@@ -134,13 +136,16 @@ public class OutputBuffer extends Buffer {
     }
     
     private void insert(Message message) {
-        long sequence = ringBuffer.next();
-        MessageEvent event = ringBuffer.get(sequence);
+        long sequence = getRingBuffer().next();
+        MessageEvent event = getRingBuffer().get(sequence);
         event.setMessage(message);
-        ringBuffer.publish(sequence);
+        getRingBuffer().publish(sequence);
 
         outputBufferWatermark.incrementAndGet();
         incomingMessages.mark();
     }
 
+    public RingBuffer<MessageEvent> getRingBuffer() {
+        return ringBuffer;
+    }
 }

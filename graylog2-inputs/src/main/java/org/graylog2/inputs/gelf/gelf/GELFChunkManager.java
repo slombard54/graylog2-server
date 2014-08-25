@@ -42,8 +42,8 @@ public class GELFChunkManager extends Thread {
 
     private final Meter outdatedMessagesDropped;
 
-    public GELFChunkManager(MetricRegistry metricRegistry, Buffer processBuffer) {
-        this.processor = new GELFProcessor(metricRegistry, processBuffer);
+    public GELFChunkManager(MetricRegistry metricRegistry, Buffer processBuffer, Buffer journalBuffer) {
+        this.processor = new GELFProcessor(metricRegistry, processBuffer, journalBuffer);
 
         this.outdatedMessagesDropped = metricRegistry.meter(name(GELFChunkManager.class, "outdatedMessagesDropped"));
     }

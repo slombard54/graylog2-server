@@ -82,7 +82,7 @@ public class GELFTCPInput extends GELFInputBase {
                 new NioServerSocketChannelFactory(bossThreadPool, workerThreadPool)
         );
 
-        bootstrap.setPipelineFactory(new GELFTCPPipelineFactory(metricRegistry, processBuffer,
+        bootstrap.setPipelineFactory(new GELFTCPPipelineFactory(metricRegistry, processBuffer, journalBuffer,
                 gelfChunkManager, this, throughputCounter, connectionCounter));
         bootstrap.setOption("child.receiveBufferSize", getRecvBufferSize());
 

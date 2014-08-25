@@ -67,7 +67,7 @@ public class ElasticSearchOutput implements MessageOutput {
     }
 
     @Override
-    public void write(List<Message> messages) throws Exception {
+    public void write(List<Message> messages) {
         if (LOG.isTraceEnabled()) {
             final List<String> sortedIds = Ordering.natural().sortedCopy(Lists.transform(messages, Message.ID_FUNCTION));
             LOG.trace("Writing message ids to [{}]: <{}>", getName(), Joiner.on(", ").join(sortedIds));
