@@ -42,7 +42,7 @@ import java.util.concurrent.Executors;
 
 public class JournalBuffer extends Buffer {
 
-    private static final Logger log = LoggerFactory.getLogger(JournalBuffer.class);
+    private static final Logger LOG = LoggerFactory.getLogger(JournalBuffer.class);
 
     private final RingBuffer<RawMessageHolder> ringBuffer;
 
@@ -55,9 +55,10 @@ public class JournalBuffer extends Buffer {
 
     @Inject
     public JournalBuffer(KafkaJournal kafkaJournal) {
-        final Disruptor disruptor = new Disruptor(new RawMessageHolder.RawMessageHolderFactory(),
-                                                  1024,
-                                                  Executors.newFixedThreadPool(4));
+        final Disruptor<RawMessageHolder> disruptor = new Disruptor<>(
+                new RawMessageHolder.RawMessageHolderFactory(),
+                1024,
+                Executors.newFixedThreadPool(4));
 
         disruptor.handleEventsWith(new JournalProcessor(kafkaJournal));
         ringBuffer = disruptor.start();
@@ -76,7 +77,7 @@ public class JournalBuffer extends Buffer {
 
     @Override
     public void insertRaw(final RawMessage rawMessage) {
-        log.info("raw message {}", rawMessage);
+        LOG.info("raw message {}", rawMessage);
 
         getRingBuffer().publishEvent(translator, rawMessage);
     }
@@ -88,7 +89,7 @@ public class JournalBuffer extends Buffer {
     public static class RawMessageHolder {
         public RawMessage rawMessage;
 
-        private static class RawMessageHolderFactory implements EventFactory {
+        private static class RawMessageHolderFactory implements EventFactory<RawMessageHolder> {
             @Override
             public RawMessageHolder newInstance() {
                 return new RawMessageHolder();

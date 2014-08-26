@@ -23,17 +23,16 @@
 package org.graylog2.plugin.journal;
 
 import com.eaio.uuid.UUID;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
 import org.joda.time.DateTime;
 
 import javax.annotation.Nullable;
 import java.io.Serializable;
-import java.nio.ByteOrder;
+import java.nio.ByteBuffer;
 
-import static com.google.common.base.Charsets.UTF_8;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Strings.isNullOrEmpty;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 /**
  * A raw message is the unparsed data Graylog2 was handed by an input.
@@ -50,34 +49,27 @@ import static com.google.common.base.Preconditions.checkNotNull;
  */
 public class RawMessage implements Serializable {
 
-    public static int CURRENT_VERSION = 1;
+    public static final byte CURRENT_VERSION = 1;
 
     private final long sequenceNumber;
-
-    private final int version;
-
+    private final byte version;
     private final UUID id;
-
     private final DateTime timestamp;
-
     private final String sourceInputId;
-
     private final String metaData;
-
     private final String payloadType;
-
-    private final ChannelBuffer payload;
+    private final byte[] payload;
 
     public RawMessage(String payloadType,
                       String sourceInputId,
-                      ChannelBuffer payload){
+                      byte[] payload) {
         this(payloadType, sourceInputId, null, payload);
     }
 
     public RawMessage(String payloadType,
                       String sourceInputId,
                       @Nullable String metaData,
-                      ChannelBuffer payload) {
+                      byte[] payload) {
         this(Long.MIN_VALUE, new UUID(), DateTime.now(), payloadType, sourceInputId, metaData, payload);
     }
 
@@ -87,99 +79,93 @@ public class RawMessage implements Serializable {
                       String payloadType,
                       String sourceInputId,
                       @Nullable String metaData,
-                      ChannelBuffer payload) {
+                      byte[] payload) {
         this.sequenceNumber = sequenceNumber;
-        checkNotNull(payload);
-        checkArgument(payload.readableBytes() > 0);
-        checkNotNull(payloadType);
-        checkArgument(!payloadType.isEmpty());
+        checkNotNull(payload, "The messsage payload must not be null!");
+        checkArgument(payload.length > 0, "The message payload must not be empty!");
+        checkArgument(!isNullOrEmpty(payloadType), "The payload type must not be null or empty!");
 
         this.version = CURRENT_VERSION;
-
         this.id = id;
         this.timestamp = timestamp;
         this.sourceInputId = sourceInputId;
         this.metaData = metaData == null ? "" : metaData;
         this.payloadType = payloadType;
-        this.payload = payload;
+        this.payload = payload.clone();
     }
 
-    public ChannelBuffer encode() {
+    public byte[] encode() {
         final byte[] sourceInputIdBytes = sourceInputId.getBytes(UTF_8);
         final byte[] metaDataBytes = metaData.getBytes(UTF_8);
         final byte[] payloadTypeBytes = payloadType.getBytes(UTF_8);
 
-        final ChannelBuffer buffer = ChannelBuffers.buffer(
-                ByteOrder.BIG_ENDIAN,
+        final int bufferSize =
                 1 + /* version */
-                    16 + /* UUID is 2 longs */
-                    8 + /* timestamp is 1 long, in millis from 1970 */
-                    2 + /* source input id length */
-                    sourceInputIdBytes.length + /* source input id string. TODO could this be a proper UUID instead? would save many bytes*/
-                    2 + /* payload type length, this should not get larger than 65535 bytes... */
-                    payloadTypeBytes.length + /* utf-8 encoded name of the payload type */
-                    4 + /* size of metadata, one int */
-                    metaDataBytes.length + /* number of bytes of UTF-8 encoded metadata, or 0 */
-                    4 + /* size of payload, one int */
-                    payload.readableBytes() /* raw length of payload data */
-        );
+                        16 + /* UUID is 2 longs */
+                        8 + /* timestamp is 1 long, in millis from 1970 */
+                        4 + /* source input id length */
+                        sourceInputIdBytes.length + /* source input id string. TODO could this be a proper UUID instead? would save many bytes*/
+                        4 + /* payload type length */
+                        payloadTypeBytes.length + /* utf-8 encoded name of the payload type */
+                        4 + /* size of metadata, one int */
+                        metaDataBytes.length + /* number of bytes of UTF-8 encoded metadata, or 0 */
+                        4 + /* size of payload, one int */
+                        payload.length; /* raw length of payload data */
 
-        buffer.writeByte(version);
-
-        buffer.writeLong(id.getTime());
-        buffer.writeLong(id.getClockSeqAndNode());
-
-        buffer.writeLong(timestamp.getMillis());
-
-        buffer.writeShort(payloadTypeBytes.length);
-        buffer.writeBytes(payloadTypeBytes);
-
-        buffer.writeShort(sourceInputIdBytes.length);
-        buffer.writeBytes(sourceInputIdBytes);
-
-        buffer.writeInt(metaDataBytes.length);
-        buffer.writeBytes(metaDataBytes);
-
-        buffer.writeInt(payload.readableBytes());
-        buffer.writeBytes(payload);
-
-        return buffer;
+        return ByteBuffer.allocate(bufferSize)
+                .put(version)
+                .putLong(id.getTime())
+                .putLong(id.getClockSeqAndNode())
+                .putLong(timestamp.getMillis())
+                .putInt(payloadTypeBytes.length)
+                .put(payloadTypeBytes)
+                .putInt(sourceInputIdBytes.length)
+                .put(sourceInputIdBytes)
+                .putInt(metaDataBytes.length)
+                .put(metaDataBytes)
+                .putInt(payload.length)
+                .put(payload)
+                .array();
     }
 
-    public static RawMessage decode(ChannelBuffer buffer, long sequenceNumber) {
+    public static RawMessage decode(final ByteBuffer buffer, final long sequenceNumber) {
 
         try {
-            final byte version = buffer.readByte();
+            final byte version = buffer.get();
             if (version > CURRENT_VERSION) {
                 throw new IllegalArgumentException("Cannot decode raw message with version " + version +
-                                                           " this decoder only supports up to version " + CURRENT_VERSION);
+                        " this decoder only supports up to version " + CURRENT_VERSION);
             }
 
-            final long time = buffer.readLong();
-            final long clockSeqAndNode = buffer.readLong();
+            final long time = buffer.getLong();
+            final long clockSeqAndNode = buffer.getLong();
 
-            final long millis = buffer.readLong();
+            final long millis = buffer.getLong();
 
-            final int payloadTypeLength = buffer.readUnsignedShort();
-            final ChannelBuffer payloadTypeBuffer = buffer.readSlice(payloadTypeLength);
+            final int payloadTypeLength = buffer.getInt();
+            final byte[] payloadType = new byte[payloadTypeLength];
+            buffer.get(payloadType);
 
-            final int sourceInputLength = buffer.readUnsignedShort();
-            final ChannelBuffer sourceInputBuffer = buffer.readSlice(sourceInputLength);
+            final int sourceInputLength = buffer.getInt();
+            final byte[] sourceInput = new byte[sourceInputLength];
+            buffer.get(sourceInput);
 
-            final int metaDataLength = buffer.readInt();
-            final ChannelBuffer metaDataBuffer = buffer.readSlice(metaDataLength);
+            final int metaDataLength = buffer.getInt();
+            final byte[] metaData = new byte[metaDataLength];
+            buffer.get(metaData);
 
-            final int payloadLength = buffer.readInt();
-            final ChannelBuffer payloadBuffer = buffer.readSlice(payloadLength);
+            final int payloadLength = buffer.getInt();
+            final byte[] payload = new byte[payloadLength];
+            buffer.get(payload);
 
             return new RawMessage(
                     sequenceNumber,
                     new UUID(time, clockSeqAndNode),
                     new DateTime(millis),
-                    payloadTypeBuffer.toString(UTF_8),
-                    sourceInputBuffer.toString(UTF_8),
-                    metaDataBuffer.toString(UTF_8),
-                    payloadBuffer);
+                    new String(payloadType, UTF_8),
+                    new String(sourceInput, UTF_8),
+                    new String(metaData, UTF_8),
+                    payload);
 
         } catch (IndexOutOfBoundsException e) {
             throw new IllegalStateException("Cannot decode truncated raw message.", e);
@@ -210,7 +196,7 @@ public class RawMessage implements Serializable {
         return payloadType;
     }
 
-    public ChannelBuffer getPayload() {
+    public byte[] getPayload() {
         return payload;
     }
 
@@ -221,10 +207,11 @@ public class RawMessage implements Serializable {
     public byte[] getIdBytes() {
         final long time = id.getTime();
         final long clockSeqAndNode = id.getClockSeqAndNode();
-        final ChannelBuffer buffer = ChannelBuffers.buffer(16);
-        buffer.writeLong(time);
-        buffer.writeLong(clockSeqAndNode);
-        return buffer.array();
+
+        return ByteBuffer.allocate(16)
+                .putLong(time)
+                .putLong(clockSeqAndNode)
+                .array();
     }
 
     @Override
@@ -236,7 +223,7 @@ public class RawMessage implements Serializable {
                 ", sourceInputId='" + sourceInputId + '\'' +
                 ", metaData='" + metaData + '\'' +
                 ", payloadType='" + payloadType + '\'' +
-                ", payload=" + payload +
+                ", payload.length=" + payload.length +
                 '}';
     }
 }

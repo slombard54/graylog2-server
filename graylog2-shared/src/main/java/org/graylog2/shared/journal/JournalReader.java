@@ -1,25 +1,28 @@
-/*
- * Copyright 2014 TORCH GmbH
+/**
+ * The MIT License
+ * Copyright (c) 2012 TORCH GmbH
  *
- * This file is part of Graylog2.
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
  *
- * Graylog2 is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
- * Graylog2 is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with Graylog2.  If not, see <http://www.gnu.org/licenses/>.
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 package org.graylog2.shared.journal;
 
 import com.codahale.metrics.MetricRegistry;
-import com.google.common.base.Charsets;
 import com.google.inject.Inject;
 import org.graylog2.inputs.gelf.gelf.GELFParser;
 import org.graylog2.plugin.Message;
@@ -36,10 +39,11 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.TimeUnit;
 
 import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
+import static java.nio.charset.StandardCharsets.UTF_8;
 
 // TODO this is not behaving well on shutdown, due to a missing stop method in Periodical
 public class JournalReader extends Periodical {
-    private static final Logger log = LoggerFactory.getLogger(JournalReader.class);
+    private static final Logger LOG = LoggerFactory.getLogger(JournalReader.class);
     private final KafkaJournal journal;
     private final ProcessBuffer processBuffer;
     private final MetricRegistry metricRegistry;
@@ -65,23 +69,23 @@ public class JournalReader extends Periodical {
             try {
                 final RawMessage raw = journal.read();
                 if (raw == null) {
-                    log.warn("Received invalid null message, this should never happen.");
+                    LOG.warn("Received invalid null message, this should never happen.");
                     continue;
                 }
-                log.info("Read message {} from journal, position {}", raw.getId(), raw.getSequenceNumber());
+                LOG.info("Read message {} from journal, position {}", raw.getId(), raw.getSequenceNumber());
                 final String payloadDecoderType = raw.getPayloadType();
                 if (!"gelf".equals(payloadDecoderType)) {
-                    log.error("invalid payload type {}", payloadDecoderType);
+                    LOG.error("invalid payload type {}", payloadDecoderType);
                 }
                 final String sourceInputId = raw.getSourceInputId();
                 final MessageInput messageInput = inputRegistry.getRunningInput(sourceInputId);
                 if (messageInput == null) {
-                    log.error("Could not load message input {}. Skipping message", sourceInputId);
+                    LOG.error("Could not load message input {}. Skipping message", sourceInputId);
                     continue;
                 }
                 final Message parsed = gelfParser.parse(
                         raw.getId(),
-                        raw.getPayload().toString(Charsets.UTF_8),
+                        new String(raw.getPayload(), UTF_8),
                         messageInput);
                 try {
                     processBuffer.insertFailFast(parsed, messageInput);
@@ -132,7 +136,7 @@ public class JournalReader extends Periodical {
 
     @Override
     protected Logger getLogger() {
-        return log;
+        return LOG;
     }
 
 }

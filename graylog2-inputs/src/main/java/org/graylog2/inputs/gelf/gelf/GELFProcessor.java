@@ -23,7 +23,6 @@ import org.graylog2.plugin.buffers.BufferOutOfCapacityException;
 import org.graylog2.plugin.buffers.ProcessingDisabledException;
 import org.graylog2.plugin.inputs.MessageInput;
 import org.graylog2.plugin.journal.RawMessage;
-import org.jboss.netty.buffer.ChannelBuffers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,7 +55,7 @@ public class GELFProcessor {
     public void messageReceived(GELFMessage message, MessageInput sourceInput) throws BufferOutOfCapacityException {
         final RawMessage rawMessage = new RawMessage("gelf",
                                                      sourceInput.getId(),
-                                                     ChannelBuffers.copiedBuffer(message.getPayload()));
+                                                     message.getPayload());
         journalBuffer.insertRaw(rawMessage);
     }
 

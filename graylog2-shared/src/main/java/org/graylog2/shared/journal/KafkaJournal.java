@@ -39,8 +39,6 @@ import kafka.message.NoCompressionCodec$;
 import kafka.utils.KafkaScheduler;
 import kafka.utils.SystemTime$;
 import org.graylog2.plugin.journal.RawMessage;
-import org.jboss.netty.buffer.ChannelBuffer;
-import org.jboss.netty.buffer.ChannelBuffers;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.Option;
@@ -56,7 +54,7 @@ import java.util.concurrent.TimeUnit;
 
 @Singleton
 public class KafkaJournal {
-    private static final Logger log = LoggerFactory.getLogger(KafkaJournal.class);
+    private static final Logger LOG = LoggerFactory.getLogger(KafkaJournal.class);
 
     private final LogManager logManager;
     private final Log kafkaLog;
@@ -117,20 +115,12 @@ public class KafkaJournal {
         } else {
             kafkaLog = messageLog.get();
         }
-        log.info("initialized kafka based journal at {}", spoolDir);
+        LOG.info("initialized kafka based journal at {}", spoolDir);
     }
 
 
-    public void write(RawMessage rawMessage) {
-
-        final ChannelBuffer buffer = rawMessage.encode();
-        final byte[] bytes;
-        if (buffer.hasArray()) {
-            bytes = buffer.array();
-        } else {
-            bytes = new byte[buffer.readableBytes()];
-            buffer.getBytes(0, bytes);
-        }
+    public void write(final RawMessage rawMessage) {
+        final byte[] bytes = rawMessage.encode();
         final KafkaMessage kafkaMessage = new KafkaMessage(bytes, rawMessage.getIdBytes(), NO_COMPRESSION_CODEC);
 
         final ByteBufferMessageSet messageSet =
@@ -138,7 +128,7 @@ public class KafkaJournal {
                                                  Collections.<kafka.message.Message>singletonList(kafkaMessage)));
         final Log.LogAppendInfo appendInfo = kafkaLog.append(messageSet, true);
         messagesInJournal.release();
-        log.info("journalled message: {} bytes, log position {}", bytes.length, appendInfo.firstOffset());
+        LOG.info("Journaled message: {} bytes, LOG position {}", bytes.length, appendInfo.firstOffset());
     }
 
     public RawMessage read() {
@@ -147,39 +137,41 @@ public class KafkaJournal {
             try {
                 messageSet = kafkaLog.read(nextReadOffset, 10 * 1024, Option.<Object>apply(nextReadOffset + 1));
                 if (messageSet.isEmpty()) {
-                    log.info("No more messages to read, blocking.");
+                    LOG.info("No more messages to read, blocking.");
                     messagesInJournal.acquireUninterruptibly();
                 } else {
                     // mark that we've taken a message
-                    log.info("More messages arrived, reading.");
+                    LOG.info("More messages arrived, reading.");
                     messagesInJournal.drainPermits();
                 }
             } catch (OffsetOutOfRangeException e) {
                 // there are no more messages to read from the log, we need to wait until new ones are available;
-                log.info("tried reading a log position which isn't available. waiting for data to arrive", e);
+                LOG.info("tried reading a LOG position which isn't available. waiting for data to arrive", e);
                 messagesInJournal.acquireUninterruptibly();
-                log.info("woken up");
+                LOG.info("woken up");
             }
         }
 
         final Iterator<MessageAndOffset> iterator = messageSet.iterator();
-        if (!(iterator.hasNext())) return null;
+        if (!(iterator.hasNext())) {
+            return null;
+        }
 
         final MessageAndOffset messageAndOffset = iterator.next();
         nextReadOffset = messageAndOffset.nextOffset();
         final ByteBuffer payload = messageAndOffset.message().payload();
 
-        if (log.isInfoEnabled()) {
+        if (LOG.isInfoEnabled()) {
             final ByteBuffer keyBuffer = messageAndOffset.message().key();
             final long time = keyBuffer.getLong();
             final long clock = keyBuffer.getLong();
 
-            log.info("Read message id {} with sequence number {}",
+            LOG.info("Read message id {} with sequence number {}",
                      new UUID(time, clock),
                      messageAndOffset.offset());
         }
 
-        return RawMessage.decode(ChannelBuffers.wrappedBuffer(payload), messageAndOffset.offset());
+        return RawMessage.decode(payload, messageAndOffset.offset());
     }
 
 
