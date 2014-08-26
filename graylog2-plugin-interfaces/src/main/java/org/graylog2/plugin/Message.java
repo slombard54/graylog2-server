@@ -22,6 +22,7 @@
  */
 package org.graylog2.plugin;
 
+import com.eaio.uuid.UUID;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
@@ -99,8 +100,15 @@ public class Message {
     private InetAddress inetAddress;
 
     public Message(String message, String source, DateTime timestamp) {
+        this(null, message, source, timestamp);
+    }
+
+    public Message(UUID id, String message, String source, DateTime timestamp) {
+        if (id == null) {
+            id = new com.eaio.uuid.UUID();
+        }
         // Adding the fields directly because they would not be accepted as a reserved fields.
-        fields.put("_id", new com.eaio.uuid.UUID().toString());
+        fields.put("_id", id.toString());
         fields.put("message", message);
         fields.put("source", source);
         fields.put("timestamp", timestamp);
@@ -108,7 +116,7 @@ public class Message {
         streams = Lists.newArrayList();
     }
 
-    public Message(Map<String, Object> fields) {
+    public Message(Map < java.lang.String, Object > fields) {
         this.fields.putAll(fields);
     }
 

@@ -18,6 +18,7 @@ package org.graylog2.inputs.gelf.gelf;
 
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
+import com.eaio.uuid.UUID;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -48,10 +49,14 @@ public class GELFParser {
     }
 
     public Message parse(String message, MessageInput sourceInput) {
-        return parse(message, sourceInput.getUniqueReadableId());
+        return parse(null, message, sourceInput.getUniqueReadableId());
     }
 
-    public Message parse(String message, String sourceInputId) {
+    public Message parse(UUID id, String message, MessageInput sourceInput) {
+        return parse(id, message, sourceInput.getUniqueReadableId());
+    }
+
+    public Message parse(UUID id, String message, String sourceInputId) {
         Timer.Context tcx = metricRegistry.timer(name(sourceInputId, "gelfParsedTime")).time();
 
         JsonNode json;
@@ -78,6 +83,7 @@ public class GELFParser {
         }
 
         Message lm = new Message(
+                id,
                 this.stringValue(json, "short_message"),
                 this.stringValue(json, "host"),
                 timestamp

@@ -33,6 +33,10 @@ import org.graylog2.shared.inputs.InputRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.concurrent.TimeUnit;
+
+import static com.google.common.util.concurrent.Uninterruptibles.sleepUninterruptibly;
+
 // TODO this is not behaving well on shutdown, due to a missing stop method in Periodical
 public class JournalReader extends Periodical {
     private static final Logger log = LoggerFactory.getLogger(JournalReader.class);
@@ -43,7 +47,10 @@ public class JournalReader extends Periodical {
     private GELFParser gelfParser;
 
     @Inject
-    public JournalReader(KafkaJournal journal, ProcessBuffer processBuffer, MetricRegistry metricRegistry, InputRegistry inputRegistry) {
+    public JournalReader(KafkaJournal journal,
+                         ProcessBuffer processBuffer,
+                         MetricRegistry metricRegistry,
+                         InputRegistry inputRegistry) {
         this.journal = journal;
         this.processBuffer = processBuffer;
         this.metricRegistry = metricRegistry;
@@ -53,6 +60,7 @@ public class JournalReader extends Periodical {
 
     @Override
     public void doRun() {
+        sleepUninterruptibly(20, TimeUnit.SECONDS);
         while (true) {
             try {
                 final RawMessage raw = journal.read();
@@ -67,8 +75,14 @@ public class JournalReader extends Periodical {
                 }
                 final String sourceInputId = raw.getSourceInputId();
                 final MessageInput messageInput = inputRegistry.getRunningInput(sourceInputId);
-                final Message parsed = gelfParser.parse(raw.getPayload().toString(Charsets.UTF_8),
-                                                        messageInput);
+                if (messageInput == null) {
+                    log.error("Could not load message input {}. Skipping message", sourceInputId);
+                    continue;
+                }
+                final Message parsed = gelfParser.parse(
+                        raw.getId(),
+                        raw.getPayload().toString(Charsets.UTF_8),
+                        messageInput);
                 try {
                     processBuffer.insertFailFast(parsed, messageInput);
                 } catch (BufferOutOfCapacityException e) {
@@ -77,7 +91,6 @@ public class JournalReader extends Periodical {
                     e.printStackTrace();
                 }
             } catch (Exception ignore) {
-                log.error("No such message input", ignore);
             }
         }
     }
@@ -109,7 +122,7 @@ public class JournalReader extends Periodical {
 
     @Override
     public int getInitialDelaySeconds() {
-        return 5;
+        return 0;
     }
 
     @Override
