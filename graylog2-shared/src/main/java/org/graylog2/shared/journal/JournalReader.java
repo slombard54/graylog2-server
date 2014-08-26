@@ -64,11 +64,11 @@ public class JournalReader extends Periodical {
         while (true) {
             try {
                 final RawMessage raw = journal.read();
-                log.info("Read message {} from journal, position {}", raw.getId(), raw.getSequenceNumber());
                 if (raw == null) {
                     log.warn("Received invalid null message, this should never happen.");
                     continue;
                 }
+                log.info("Read message {} from journal, position {}", raw.getId(), raw.getSequenceNumber());
                 final String payloadDecoderType = raw.getPayloadType();
                 if (!"gelf".equals(payloadDecoderType)) {
                     log.error("invalid payload type {}", payloadDecoderType);
