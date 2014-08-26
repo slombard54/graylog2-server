@@ -22,6 +22,7 @@
  */
 package org.graylog2.shared.journal;
 
+import com.eaio.uuid.UUID;
 import com.google.inject.Inject;
 import com.google.inject.Singleton;
 import com.google.inject.name.Named;
@@ -63,7 +64,7 @@ public class KafkaJournal {
 
     public static final NoCompressionCodec$ NO_COMPRESSION_CODEC = NoCompressionCodec$.MODULE$;
 
-    private long readOffset = 0L; // TODO read from persisted store
+    private long nextReadOffset = 0L; // TODO read from persisted store
 
     @Inject
     public KafkaJournal(@Named("spoolDirectory") String spoolDir) {
@@ -117,20 +118,6 @@ public class KafkaJournal {
             kafkaLog = messageLog.get();
         }
         log.info("initialized kafka based journal at {}", spoolDir);
-
-        final Thread thread = new Thread() {
-            @Override
-            public void run() {
-                while (true) {
-                    final RawMessage message = read();
-                    if (message != null) {
-                        log.info("Read message {}", message);
-                    }
-                }
-            }
-        };
-        thread.setDaemon(true);
-        thread.start();
     }
 
 
@@ -158,7 +145,7 @@ public class KafkaJournal {
         MessageSet messageSet = null;
         while (messageSet == null || messageSet.isEmpty()) {
             try {
-                messageSet = kafkaLog.read(readOffset, 10 * 1024, Option.<Object>apply(readOffset + 1));
+                messageSet = kafkaLog.read(nextReadOffset, 10 * 1024, Option.<Object>apply(nextReadOffset + 1));
                 if (messageSet.isEmpty()) {
                     log.info("No more messages to read, blocking.");
                     messagesInJournal.acquireUninterruptibly();
@@ -169,6 +156,7 @@ public class KafkaJournal {
                 }
             } catch (OffsetOutOfRangeException e) {
                 // there are no more messages to read from the log, we need to wait until new ones are available;
+                log.info("tried reading a log position which isn't available. waiting for data to arrive", e);
                 messagesInJournal.acquireUninterruptibly();
                 log.info("woken up");
             }
@@ -178,14 +166,20 @@ public class KafkaJournal {
         if (!(iterator.hasNext())) return null;
 
         final MessageAndOffset messageAndOffset = iterator.next();
-        readOffset = messageAndOffset.nextOffset();
+        nextReadOffset = messageAndOffset.nextOffset();
         final ByteBuffer payload = messageAndOffset.message().payload();
-        log.info("Read message sequence number {}", messageAndOffset.offset());
-        return RawMessage.decode(ChannelBuffers.wrappedBuffer(payload));
 
-        // TODO now lookup the payload type parser and convert rawMessage to Message
-        // then insert into
+        if (log.isInfoEnabled()) {
+            final ByteBuffer keyBuffer = messageAndOffset.message().key();
+            final long time = keyBuffer.getLong();
+            final long clock = keyBuffer.getLong();
 
+            log.info("Read message id {} with sequence number {}",
+                     new UUID(time, clock),
+                     messageAndOffset.offset());
+        }
+
+        return RawMessage.decode(ChannelBuffers.wrappedBuffer(payload), messageAndOffset.offset());
     }
 
 

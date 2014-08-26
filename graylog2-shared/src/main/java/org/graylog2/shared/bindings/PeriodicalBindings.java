@@ -36,7 +36,7 @@ public class PeriodicalBindings extends AbstractModule {
     @Override
     protected void configure() {
         Multibinder<Periodical> periodicalBinder = Multibinder.newSetBinder(binder(), Periodical.class);
-        Reflections reflections = new Reflections("org.graylog2.periodical");
+        Reflections reflections = new Reflections("org.graylog2");
         for (Class<? extends Periodical> periodicalClass : reflections.getSubTypesOf(Periodical.class))
             if (!Modifier.isAbstract(periodicalClass.getModifiers()))
                 periodicalBinder.addBinding().to(periodicalClass);

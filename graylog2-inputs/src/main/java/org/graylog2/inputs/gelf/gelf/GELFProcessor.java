@@ -55,14 +55,9 @@ public class GELFProcessor {
 
     public void messageReceived(GELFMessage message, MessageInput sourceInput) throws BufferOutOfCapacityException {
         final RawMessage rawMessage = new RawMessage("gelf",
-                                                     sourceInput.getUniqueReadableId(),
-                                                     null,
+                                                     sourceInput.getId(),
                                                      ChannelBuffers.copiedBuffer(message.getPayload()));
         journalBuffer.insertRaw(rawMessage);
-
-//        Message lm = prepareMessage(message, sourceInput);
-//        if (lm == null) return;
-//        processBuffer.insertCached(lm, sourceInput);
     }
 
     public void messageReceivedFailFast(GELFMessage message, MessageInput sourceInput) throws BufferOutOfCapacityException, ProcessingDisabledException {

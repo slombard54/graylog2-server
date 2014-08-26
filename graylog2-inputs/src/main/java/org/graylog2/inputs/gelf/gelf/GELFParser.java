@@ -48,7 +48,11 @@ public class GELFParser {
     }
 
     public Message parse(String message, MessageInput sourceInput) {
-        Timer.Context tcx = metricRegistry.timer(name(sourceInput.getUniqueReadableId(), "gelfParsedTime")).time();
+        return parse(message, sourceInput.getUniqueReadableId());
+    }
+
+    public Message parse(String message, String sourceInputId) {
+        Timer.Context tcx = metricRegistry.timer(name(sourceInputId, "gelfParsedTime")).time();
 
         JsonNode json;
 

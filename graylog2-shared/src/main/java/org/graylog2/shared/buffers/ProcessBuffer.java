@@ -125,7 +125,8 @@ public class ProcessBuffer extends Buffer {
         
         ringBuffer = disruptor.start();
     }
-    
+
+
     @Override
     public void insertCached(Message message, MessageInput sourceInput) {
         message.setSourceInput(sourceInput);

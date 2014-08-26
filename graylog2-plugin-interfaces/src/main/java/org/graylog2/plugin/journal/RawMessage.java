@@ -52,6 +52,8 @@ public class RawMessage implements Serializable {
 
     public static int CURRENT_VERSION = 1;
 
+    private final long sequenceNumber;
+
     private final int version;
 
     private final UUID id;
@@ -76,15 +78,17 @@ public class RawMessage implements Serializable {
                       String sourceInputId,
                       @Nullable String metaData,
                       ChannelBuffer payload) {
-        this(new UUID(), DateTime.now(), payloadType, sourceInputId, metaData, payload);
+        this(Long.MIN_VALUE, new UUID(), DateTime.now(), payloadType, sourceInputId, metaData, payload);
     }
 
-    public RawMessage(UUID id,
+    public RawMessage(long sequenceNumber,
+                      UUID id,
                       DateTime timestamp,
                       String payloadType,
                       String sourceInputId,
                       @Nullable String metaData,
                       ChannelBuffer payload) {
+        this.sequenceNumber = sequenceNumber;
         checkNotNull(payload);
         checkArgument(payload.readableBytes() > 0);
         checkNotNull(payloadType);
@@ -142,7 +146,8 @@ public class RawMessage implements Serializable {
         return buffer;
     }
 
-    public static RawMessage decode(ChannelBuffer buffer) {
+    public static RawMessage decode(ChannelBuffer buffer, long sequenceNumber) {
+
         try {
             final byte version = buffer.readByte();
             if (version > CURRENT_VERSION) {
@@ -168,6 +173,7 @@ public class RawMessage implements Serializable {
             final ChannelBuffer payloadBuffer = buffer.readSlice(payloadLength);
 
             return new RawMessage(
+                    sequenceNumber,
                     new UUID(time, clockSeqAndNode),
                     new DateTime(millis),
                     payloadTypeBuffer.toString(UTF_8),
@@ -180,17 +186,32 @@ public class RawMessage implements Serializable {
         }
     }
 
-    @Override
-    public String toString() {
-        return "RawMessage{" +
-                "version=" + version +
-                ", id=" + id +
-                ", timestamp=" + timestamp +
-                ", sourceInputId='" + sourceInputId + '\'' +
-                ", metaData='" + metaData + '\'' +
-                ", payloadType='" + payloadType + '\'' +
-                ", payload=" + payload +
-                '}';
+    public long getSequenceNumber() {
+        return sequenceNumber;
+    }
+
+    public int getVersion() {
+        return version;
+    }
+
+    public DateTime getTimestamp() {
+        return timestamp;
+    }
+
+    public String getSourceInputId() {
+        return sourceInputId;
+    }
+
+    public String getMetaData() {
+        return metaData;
+    }
+
+    public String getPayloadType() {
+        return payloadType;
+    }
+
+    public ChannelBuffer getPayload() {
+        return payload;
     }
 
     public UUID getId() {
@@ -204,5 +225,18 @@ public class RawMessage implements Serializable {
         buffer.writeLong(time);
         buffer.writeLong(clockSeqAndNode);
         return buffer.array();
+    }
+
+    @Override
+    public String toString() {
+        return "RawMessage{" +
+                "version=" + version +
+                ", id=" + id +
+                ", timestamp=" + timestamp +
+                ", sourceInputId='" + sourceInputId + '\'' +
+                ", metaData='" + metaData + '\'' +
+                ", payloadType='" + payloadType + '\'' +
+                ", payload=" + payload +
+                '}';
     }
 }
