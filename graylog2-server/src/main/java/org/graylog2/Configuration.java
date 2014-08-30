@@ -30,6 +30,7 @@ import org.graylog2.plugin.BaseConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.net.InetAddress;
 import java.net.URI;
 import java.net.UnknownHostException;
 import java.util.List;
@@ -38,12 +39,8 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 
 /**
  * Helper class to hold configuration of Graylog2
- *
- * @author Lennart Koopmann <lennart@socketfeed.com>
- * @author Jochen Schalanda <jochen@schalanda.name>
  */
 public class Configuration extends BaseConfiguration {
-
     private static final Logger LOG = LoggerFactory.getLogger(Configuration.class);
 
     @Parameter(value = "is_master", required = true)
@@ -53,7 +50,7 @@ public class Configuration extends BaseConfiguration {
     private String passwordSecret;
 
     @Parameter(value = "rest_listen_uri", required = true)
-    private String restListenUri = "http://127.0.0.1:12900/";
+    private URI restListenUri = URI.create("http://127.0.0.1:" + GRAYLOG2_DEFAULT_PORT + "/");
 
     @Parameter(value = "udp_recvbuffer_sizes", required = true, validator = PositiveIntegerValidator.class)
     private int udpRecvBufferSizes = 1048576;
@@ -410,9 +407,8 @@ public class Configuration extends BaseConfiguration {
     }
 
     public List<ServerAddress> getMongoReplicaSet() {
-        List<ServerAddress> replicaServers = Lists.newArrayList();
-
-        List<String> rawSet = mongoReplicaSet;
+        final List<ServerAddress> replicaServers = Lists.newArrayList();
+        final List<String> rawSet = mongoReplicaSet;
 
         if (rawSet == null || rawSet.isEmpty()) {
             return null;
@@ -420,19 +416,24 @@ public class Configuration extends BaseConfiguration {
 
         for (String host : rawSet) {
             // Split host:port.
-            String[] replicaTarget = host.split(":");
+            final String[] replicaTarget = host.split(":");
 
             // Check if valid.
-            if (replicaTarget == null || replicaTarget.length != 2) {
+            if (replicaTarget.length != 2) {
                 LOG.error("Malformed mongodb_replica_set configuration.");
                 return null;
             }
 
             // Get host and port.
             try {
-                replicaServers.add(new ServerAddress(replicaTarget[0], Integer.parseInt(replicaTarget[1])));
+                replicaServers.add(new ServerAddress(
+                        InetAddress.getByName(replicaTarget[0]),
+                        Integer.parseInt(replicaTarget[1])));
             } catch (UnknownHostException e) {
                 LOG.error("Unknown host in mongodb_replica_set: " + e.getMessage(), e);
+                return null;
+            } catch (NumberFormatException e) {
+                LOG.error("Invalid port in mongodb_replica_set: " + e.getMessage(), e);
                 return null;
             }
         }
@@ -453,7 +454,7 @@ public class Configuration extends BaseConfiguration {
     }
 
     public URI getRestListenUri() {
-        return Tools.getUriStandard(restListenUri);
+        return Tools.getUriWithPort(restListenUri, GRAYLOG2_DEFAULT_PORT);
     }
 
     public String getRootUsername() {

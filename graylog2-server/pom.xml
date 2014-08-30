@@ -39,7 +39,7 @@
     <parent>
         <groupId>org.graylog2</groupId>
         <artifactId>graylog2-parent</artifactId>
-        <version>0.21.0-beta3-SNAPSHOT</version>
+        <version>0.21.0-rc2-SNAPSHOT</version>
     </parent>
 
     <properties>
@@ -211,10 +211,6 @@
         <dependency>
             <groupId>commons-io</groupId>
             <artifactId>commons-io</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.httpcomponents</groupId>
-            <artifactId>httpcore</artifactId>
         </dependency>
         <dependency>
             <groupId>com.joestelmach</groupId>
