@@ -43,7 +43,6 @@
     </parent>
 
     <properties>
-        <metrics.version>3.0.0</metrics.version>
         <mainClass>org.graylog2.Main</mainClass>
     </properties>
 
@@ -160,19 +159,19 @@
         </dependency>
 
         <dependency>
-            <groupId>com.codahale.metrics</groupId>
+            <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-annotation</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.codahale.metrics</groupId>
+            <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-core</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.codahale.metrics</groupId>
+            <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-log4j</artifactId>
         </dependency>
         <dependency>
-            <groupId>com.codahale.metrics</groupId>
+            <groupId>io.dropwizard.metrics</groupId>
             <artifactId>metrics-jvm</artifactId>
         </dependency>
 
