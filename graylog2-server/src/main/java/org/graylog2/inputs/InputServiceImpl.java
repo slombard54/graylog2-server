@@ -277,11 +277,6 @@ public class InputServiceImpl extends PersistedServiceImpl implements InputServi
             input.setGlobal(true);
         }
 
-        // Add extractors.
-        for (Extractor extractor : this.getExtractors(io)) {
-            input.addExtractor(extractor.getId(), extractor);
-        }
-
         // Add static fields.
         input.addStaticFields(io.getStaticFields());
 

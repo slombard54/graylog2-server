@@ -69,7 +69,6 @@ public abstract class MessageInput {
 
     protected Configuration configuration;
 
-    private Map<String, Extractor> extractors = Maps.newHashMap(); // access is synchronized.
     private Map<String, String> staticFields = Maps.newConcurrentMap();
 
     public void initialize(Configuration configuration) {
@@ -201,18 +200,6 @@ public abstract class MessageInput {
         inputMap.put(FIELD_GLOBAL, this.getGlobal());
 
         return inputMap;
-    }
-
-    public synchronized void addExtractor(String id, Extractor extractor) {
-        this.extractors.put(id, extractor);
-    }
-
-    public synchronized void addExtractors(Map<String, Extractor> extractors) {
-        this.extractors.putAll(extractors);
-    }
-
-    public Map<String, Extractor> getExtractors() {
-        return this.extractors;
     }
 
     public void addStaticField(String key, String value) {
