@@ -151,7 +151,7 @@
         </dependency>
         <dependency>
             <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka_2.9.2</artifactId>
+            <artifactId>kafka_2.10</artifactId>
         </dependency>
         <dependency>
             <groupId>com.rabbitmq</groupId>
