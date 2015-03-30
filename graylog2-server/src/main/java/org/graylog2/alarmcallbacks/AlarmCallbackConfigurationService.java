@@ -18,6 +18,7 @@ package org.graylog2.alarmcallbacks;
 
 import org.graylog2.plugin.database.PersistedService;
 import org.graylog2.plugin.streams.Stream;
+import org.graylog2.rest.models.alarmcallbacks.requests.CreateAlarmCallbackRequest;
 
 import java.util.List;
 
@@ -29,4 +30,5 @@ public interface AlarmCallbackConfigurationService extends PersistedService {
     public List<AlarmCallbackConfiguration> getForStream(Stream stream);
     public AlarmCallbackConfiguration load(String alarmCallbackId);
     public AlarmCallbackConfiguration create(String streamId, CreateAlarmCallbackRequest request, String userId);
+    public long count();
 }

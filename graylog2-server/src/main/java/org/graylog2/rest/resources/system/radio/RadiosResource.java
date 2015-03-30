@@ -29,17 +29,16 @@ import org.bson.types.ObjectId;
 import org.graylog2.cluster.Node;
 import org.graylog2.cluster.NodeNotFoundException;
 import org.graylog2.cluster.NodeService;
-import org.graylog2.plugin.database.ValidationException;
 import org.graylog2.inputs.Input;
-import org.graylog2.inputs.InputImpl;
 import org.graylog2.inputs.InputService;
 import org.graylog2.plugin.Tools;
+import org.graylog2.plugin.database.ValidationException;
+import org.graylog2.rest.models.radio.requests.PingRequest;
 import org.graylog2.rest.models.radio.responses.PersistedInputsResponse;
 import org.graylog2.rest.models.radio.responses.PersistedInputsSummaryResponse;
 import org.graylog2.rest.models.radio.responses.RegisterInputResponse;
 import org.graylog2.shared.rest.resources.RestResource;
-import org.graylog2.rest.models.radio.requests.PingRequest;
-import org.graylog2.rest.resources.system.radio.responses.RadioSummary;
+import org.graylog2.rest.models.system.radio.responses.RadioSummary;
 import org.graylog2.rest.models.system.inputs.requests.RegisterInputRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -164,7 +163,7 @@ public class RadiosResource extends RestResource {
             inputData.put("radio_id", rir.radioId());
         }
 
-        final Input mongoInput = new InputImpl(inputData);
+        final Input mongoInput = inputService.create(inputData);
 
         // Write to database.
         final String id = inputService.save(mongoInput);

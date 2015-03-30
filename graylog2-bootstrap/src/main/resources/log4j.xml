@@ -29,8 +29,13 @@
     <logger name="org.elasticsearch.script">
         <level value="warn"/>
     </logger>
+
     <!-- stop spark data dump -->
     <logger name="org.apache.spark">
+        <level value="warn"/>
+    </logger>
+    <!-- Suppress crazy byte array dump of Drools -->
+    <logger name="org.drools.compiler.kie.builder.impl.KieRepositoryImpl">
         <level value="warn"/>
     </logger>
     <!-- Root Logger -->

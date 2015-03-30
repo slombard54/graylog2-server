@@ -17,7 +17,6 @@
 package org.graylog2.rest.resources.alarmcallbacks;
 
 import com.codahale.metrics.annotation.Timed;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.wordnik.swagger.annotations.Api;
@@ -28,11 +27,16 @@ import com.wordnik.swagger.annotations.ApiResponses;
 import org.apache.shiro.authz.annotation.RequiresAuthentication;
 import org.graylog2.alarmcallbacks.AlarmCallbackConfiguration;
 import org.graylog2.alarmcallbacks.AlarmCallbackConfigurationService;
-import org.graylog2.alarmcallbacks.CreateAlarmCallbackRequest;
+import org.graylog2.rest.models.alarmcallbacks.requests.CreateAlarmCallbackRequest;
 import org.graylog2.database.NotFoundException;
 import org.graylog2.plugin.database.ValidationException;
 import org.graylog2.plugin.alarms.callbacks.AlarmCallback;
 import org.graylog2.plugin.streams.Stream;
+import org.graylog2.rest.models.alarmcallbacks.AlarmCallbackListSummary;
+import org.graylog2.rest.models.alarmcallbacks.AlarmCallbackSummary;
+import org.graylog2.rest.models.alarmcallbacks.responses.CreateAlarmCallbackResponse;
+import org.graylog2.rest.models.alarmcallbacks.responses.AvailableAlarmCallbacksResponse;
+import org.graylog2.rest.models.alarmcallbacks.responses.AvailableAlarmCallbackSummaryResponse;
 import org.graylog2.shared.rest.resources.RestResource;
 import org.graylog2.shared.security.RestPermissions;
 import org.graylog2.streams.StreamService;
@@ -81,18 +85,23 @@ public class AlarmCallbackResource extends RestResource {
     @Timed
     @ApiOperation(value = "Get a list of all alarm callbacks for this stream")
     @Produces(MediaType.APPLICATION_JSON)
-    public Map<String, Object> get(@ApiParam(name = "streamid", value = "The id of the stream whose alarm callbacks we want.", required = true)
+    public AlarmCallbackListSummary get(@ApiParam(name = "streamid", value = "The id of the stream whose alarm callbacks we want.", required = true)
                                    @PathParam("streamid") String streamid) throws NotFoundException {
         final Stream stream = streamService.load(streamid);
 
-        final List<Map<String, Object>> alarmCallbacks = Lists.newArrayList();
+        final List<AlarmCallbackSummary> alarmCallbacks = Lists.newArrayList();
         for (AlarmCallbackConfiguration callback : alarmCallbackConfigurationService.getForStream(stream)) {
-            alarmCallbacks.add(callback.getFields());
+            alarmCallbacks.add(AlarmCallbackSummary.create(
+                    callback.getId(),
+                    callback.getStreamId(),
+                    callback.getType(),
+                    callback.getConfiguration().getSource(),
+                    callback.getCreatedAt(),
+                    callback.getCreatorUserId()
+            ));
         }
 
-        return ImmutableMap.of(
-                "alarmcallbacks", alarmCallbacks,
-                "total", alarmCallbacks.size());
+        return AlarmCallbackListSummary.create(alarmCallbacks);
     }
 
     @GET
@@ -100,7 +109,7 @@ public class AlarmCallbackResource extends RestResource {
     @Timed
     @ApiOperation(value = "Get a single specified alarm callback for this stream")
     @Produces(MediaType.APPLICATION_JSON)
-    public Map<String, Object> get(@ApiParam(name = "streamid", value = "The id of the stream whose alarm callbacks we want.", required = true)
+    public AlarmCallbackSummary get(@ApiParam(name = "streamid", value = "The id of the stream whose alarm callbacks we want.", required = true)
                                    @PathParam("streamid") String streamid,
                                    @ApiParam(name = "alarmCallbackId", value = "The alarm callback id we are getting", required = true)
                                    @PathParam("alarmCallbackId") String alarmCallbackId) throws NotFoundException {
@@ -111,12 +120,13 @@ public class AlarmCallbackResource extends RestResource {
             throw new javax.ws.rs.NotFoundException();
         }
 
-        return result.getFields();
+        return AlarmCallbackSummary.create(result.getId(), result.getStreamId(), result.getType(), result.getConfiguration().getSource(), result.getCreatedAt(), result.getCreatorUserId());
     }
 
     @POST
     @Timed
-    @ApiOperation(value = "Create an alarm callback")
+    @ApiOperation(value = "Create an alarm callback",
+            response = CreateAlarmCallbackResponse.class)
     @Consumes(MediaType.APPLICATION_JSON)
     @Produces(MediaType.APPLICATION_JSON)
     public Response create(@ApiParam(name = "streamid", value = "The stream id this new alarm callback belongs to.", required = true)
@@ -137,12 +147,11 @@ public class AlarmCallbackResource extends RestResource {
             throw new BadRequestException(e);
         }
 
-        final Map<String, String> result = ImmutableMap.of("alarmcallback_id", id);
         final URI alarmCallbackUri = getUriBuilderToSelf().path(AlarmCallbackResource.class)
                 .path("{alarmCallbackId}")
                 .build(streamid, id);
 
-        return Response.created(alarmCallbackUri).entity(result).build();
+        return Response.created(alarmCallbackUri).entity(CreateAlarmCallbackResponse.create(id)).build();
     }
 
     @GET
@@ -150,17 +159,20 @@ public class AlarmCallbackResource extends RestResource {
     @Timed
     @ApiOperation(value = "Get a list of all alarm callback types")
     @Produces(MediaType.APPLICATION_JSON)
-    public Map<String, Map<String, Object>> available(@ApiParam(name = "streamid", value = "The id of the stream whose alarm callbacks we want.", required = true)
+    public AvailableAlarmCallbacksResponse available(@ApiParam(name = "streamid", value = "The id of the stream whose alarm callbacks we want.", required = true)
                                                       @PathParam("streamid") String streamid) {
-        final Map<String, Object> types = Maps.newHashMapWithExpectedSize(availableAlarmCallbacks.size());
+        final Map<String, AvailableAlarmCallbackSummaryResponse> types = Maps.newHashMapWithExpectedSize(availableAlarmCallbacks.size());
         for (AlarmCallback availableAlarmCallback : availableAlarmCallbacks) {
-            Map<String, Object> type = Maps.newHashMap();
-            type.put("requested_configuration", availableAlarmCallback.getRequestedConfiguration().asList());
-            type.put("name", availableAlarmCallback.getName());
+            final AvailableAlarmCallbackSummaryResponse type = new AvailableAlarmCallbackSummaryResponse();
+            type.name = availableAlarmCallback.getName();
+            type.requested_configuration = availableAlarmCallback.getRequestedConfiguration().asList();
             types.put(availableAlarmCallback.getClass().getCanonicalName(), type);
         }
 
-        return ImmutableMap.of("types", types);
+        final AvailableAlarmCallbacksResponse response = new AvailableAlarmCallbacksResponse();
+        response.types = types;
+
+        return response;
     }
 
     @DELETE

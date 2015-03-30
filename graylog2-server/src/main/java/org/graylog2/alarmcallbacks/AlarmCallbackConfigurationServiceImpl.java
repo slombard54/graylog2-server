@@ -25,6 +25,7 @@ import org.graylog2.database.MongoConnection;
 import org.graylog2.database.PersistedServiceImpl;
 import org.graylog2.plugin.Tools;
 import org.graylog2.plugin.streams.Stream;
+import org.graylog2.rest.models.alarmcallbacks.requests.CreateAlarmCallbackRequest;
 
 import javax.inject.Inject;
 import java.util.List;
@@ -71,5 +72,10 @@ public class AlarmCallbackConfigurationServiceImpl extends PersistedServiceImpl 
         fields.put("creator_user_id", userId);
 
         return new AlarmCallbackConfigurationImpl(fields);
+    }
+
+    @Override
+    public long count() {
+        return count(AlarmCallbackConfigurationImpl.class, new BasicDBObject());
     }
 }
