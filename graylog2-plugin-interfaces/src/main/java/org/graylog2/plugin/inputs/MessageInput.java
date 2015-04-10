@@ -22,12 +22,14 @@
  */
 package org.graylog2.plugin.inputs;
 
+import com.codahale.metrics.Counter;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.MetricSet;
 import com.fasterxml.jackson.annotation.JsonValue;
 import com.google.common.collect.Maps;
 import org.graylog2.plugin.AbstractDescriptor;
+import org.graylog2.plugin.GlobalMetricNames;
 import org.graylog2.plugin.LocalMetricRegistry;
 import org.graylog2.plugin.ServerStatus;
 import org.graylog2.plugin.Stoppable;
@@ -83,6 +85,7 @@ public abstract class MessageInput implements Stoppable {
      * avoid serialising those parts of the configuration in order to save bytes on disk/network.
      */
     private final Configuration codecConfig;
+    private final Counter globalIncomingMessages;
 
     protected String title;
     protected String creatorUserId;
@@ -117,6 +120,7 @@ public abstract class MessageInput implements Stoppable {
         this.codecConfig = config.codecConfig.getRequestedConfiguration().filter(codec.getConfiguration());
         rawSize = localRegistry.meter("rawSize");
         incomingMessages = localRegistry.meter("incomingMessages");
+        globalIncomingMessages = metricRegistry.counter(GlobalMetricNames.INPUT_THROUGHPUT);
     }
 
     public static long getDefaultRecvBufferSize() {
@@ -130,10 +134,14 @@ public abstract class MessageInput implements Stoppable {
     public void initialize() {
         this.transportMetrics = transport.getMetricSet();
 
-        if (transportMetrics != null) {
-            metricRegistry.register(getUniqueReadableId(), transportMetrics);
+        try {
+            if (transportMetrics != null) {
+                metricRegistry.register(getUniqueReadableId(), transportMetrics);
+            }
+            metricRegistry.register(getUniqueReadableId(), localRegistry);
+        } catch (IllegalArgumentException ignored) {
+            // This happens for certain types of inputs, see https://github.com/Graylog2/graylog2-server/issues/1049#issuecomment-88857134
         }
-        metricRegistry.register(getUniqueReadableId(), localRegistry);
     }
 
     public void checkConfiguration() throws ConfigurationException {
@@ -324,6 +332,7 @@ public abstract class MessageInput implements Stoppable {
         inputBuffer.insert(rawMessage);
 
         incomingMessages.mark();
+        globalIncomingMessages.inc();
         rawSize.mark(rawMessage.getPayload().length);
     }
 

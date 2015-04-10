@@ -14,22 +14,26 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog2.restclient.models.api.requests.dashboards;
 
-import com.google.common.collect.Lists;
-import org.graylog2.restclient.models.api.requests.ApiRequest;
+package org.graylog2.rest.models.tools.requests;
 
-import java.util.List;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.auto.value.AutoValue;
 
-/**
- * @author Lennart Koopmann <lennart@torch.sh>
- */
-public class SetWidgetPositionsRequest extends ApiRequest {
+@JsonAutoDetect
+@AutoValue
+public abstract class GrokTestRequest {
+    @JsonProperty
+    public abstract String string();
 
-    public List<WidgetPositionRequest> positions;
+    @JsonProperty
+    public abstract String pattern();
 
-    public SetWidgetPositionsRequest() {
-        this.positions = Lists.newArrayList();
+    @JsonCreator
+    public static GrokTestRequest create(@JsonProperty("string") String string,
+                                         @JsonProperty("pattern") String pattern) {
+        return new AutoValue_GrokTestRequest(string, pattern);
     }
-
 }

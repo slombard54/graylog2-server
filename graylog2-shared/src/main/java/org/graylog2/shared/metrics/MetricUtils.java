@@ -16,9 +16,12 @@
  */
 package org.graylog2.shared.metrics;
 
+import com.codahale.metrics.Gauge;
 import com.codahale.metrics.Histogram;
 import com.codahale.metrics.Meter;
 import com.codahale.metrics.Metric;
+import com.codahale.metrics.MetricFilter;
+import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.google.common.collect.Maps;
 import org.graylog2.rest.models.metrics.responses.RateMetricsResponse;
@@ -163,4 +166,39 @@ public class MetricUtils {
         return metrics;
     }
 
+    public static MetricFilter filterSingleMetric(String name) {
+        return new SingleMetricFilter(name);
+    }
+
+    public static <T extends Metric> T safelyRegister(MetricRegistry metricRegistry, String name, T metric) {
+        try {
+            return metricRegistry.register(name, metric);
+        } catch (IllegalArgumentException ignored) {
+            // safely ignore already existing metric, and simply return the one registered previously.
+            // note that we do not guard against differing metric types here, we consider that a programming error for now.
+
+            //noinspection unchecked
+            return (T) metricRegistry.getMetrics().get(name);
+        }
+    }
+    public static Gauge<Long> constantGauge(final long constant) {
+        return new Gauge<Long>() {
+            @Override
+            public Long getValue() {
+                return constant;
+            }
+        };
+    }
+
+    public static class SingleMetricFilter implements MetricFilter {
+        private final String allowedName;
+        public SingleMetricFilter(String allowedName) {
+            this.allowedName = allowedName;
+        }
+
+        @Override
+        public boolean matches(String name, Metric metric) {
+            return allowedName.equals(name);
+        }
+    }
 }

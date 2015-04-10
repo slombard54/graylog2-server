@@ -14,15 +14,26 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog2.restclient.models.api.requests.dashboards;
 
-/**
- * @author Lennart Koopmann <lennart@torch.sh>
- */
-public class WidgetPositionRequest {
+package org.graylog2.rest.models.tools.requests;
 
-    public String id;
-    public int col;
-    public int row;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.auto.value.AutoValue;
 
+@JsonAutoDetect
+@AutoValue
+public abstract class RegexTestRequest {
+    @JsonProperty
+    public abstract String string();
+
+    @JsonProperty
+    public abstract String regex();
+
+    @JsonCreator
+    public static RegexTestRequest create(@JsonProperty("string") String string,
+                                          @JsonProperty("regex") String regex) {
+        return new AutoValue_RegexTestRequest(string, regex);
+    }
 }

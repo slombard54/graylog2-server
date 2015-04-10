@@ -16,6 +16,7 @@
  */
 package org.graylog2.restclient.models.dashboards.widgets;
 
+import org.graylog2.rest.models.dashboards.requests.AddWidgetRequest;
 import org.graylog2.restclient.lib.APIException;
 import org.graylog2.restclient.lib.ApiClient;
 import org.graylog2.restclient.lib.timeranges.InvalidRangeParametersException;
@@ -52,6 +53,9 @@ public abstract class DashboardWidget {
 
     private int col = 1;
     private int row = 1;
+
+    private int height = 0;
+    private int width = 0;
 
     protected DashboardWidget(Type type, String id, String description, int cacheTime, Dashboard dashboard, String query, TimeRange timeRange) {
         this(type, id, description, cacheTime, dashboard, null, query, timeRange);
@@ -96,11 +100,26 @@ public abstract class DashboardWidget {
         this.row = row;
     }
 
+    public void setHeight(int height) {
+        this.height = height;
+    }
+
+    public void setWidth(int width) {
+        this.width = width;
+    }
+
     public DashboardWidgetValueResponse getValue(ApiClient api) throws APIException, IOException {
         return api.path(routes.DashboardsResource().widgetValue(dashboard.getId(), id),  DashboardWidgetValueResponse.class)
                     .onlyMasterNode()
                     .execute();
     }
+
+    public void updateWidget(ApiClient api, AddWidgetRequest addWidgetRequest) throws APIException, IOException {
+        api.path(routes.DashboardsResource().updateWidget(dashboard.getId(), id))
+                .body(addWidgetRequest)
+                .onlyMasterNode()
+                .execute();
+    };
 
     public void updateDescription(ApiClient api, String newDescription) throws APIException, IOException {
         WidgetUpdateRequest wur = new WidgetUpdateRequest();
@@ -183,6 +202,7 @@ public abstract class DashboardWidget {
                         (String) w.config.get("query"),
                         TimeRange.factory((Map<String, Object>) w.config.get("timerange")),
                         (String) w.config.get("field"),
+                        w.config.get("show_pie_chart") != null && Boolean.parseBoolean(String.valueOf(w.config.get("show_pie_chart"))),
                         w.creatorUserId
                 );
                 break;
@@ -218,18 +238,24 @@ public abstract class DashboardWidget {
             default:
                 throw new NoSuchWidgetTypeException();
         }
-        // Read and set positions. Defaults to 1, which is then rescued by the JS dashboard library.
+        // Read and set positions. Defaults to 0, which is then rescued by the JS dashboard library.
         if (dashboard.getPositions().containsKey(w.id)) {
             widget.setCol(dashboard.getPositions().get(w.id).col);
             widget.setRow(dashboard.getPositions().get(w.id).row);
+            widget.setHeight(dashboard.getPositions().get(w.id).height);
+            widget.setWidth(dashboard.getPositions().get(w.id).width);
         }
 
         return widget;
     }
 
     public abstract Map<String, Object> getConfig();
-    public abstract int getWidth();
-    public abstract int getHeight();
+    public int getWidth() {
+        return width;
+    };
+    public int getHeight() {
+        return height;
+    };
     public abstract String getStreamId();
 
     /* Indicate if the representation should contain the whole searched time range */
