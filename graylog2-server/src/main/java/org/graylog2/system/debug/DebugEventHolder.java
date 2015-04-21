@@ -14,33 +14,25 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog2.restclient.lib.metrics;
+package org.graylog2.system.debug;
 
-import java.text.DecimalFormat;
+public class DebugEventHolder {
+    private static volatile DebugEvent clusterEvent;
+    private static volatile DebugEvent localEvent;
 
-/**
- * @author Lennart Koopmann <lennart@torch.sh>
- */
-public class Gauge extends Metric {
-
-    private final Object value;
-    DecimalFormat df = new DecimalFormat("#.##");
-
-
-    public Gauge(Object value) {
-        super(MetricType.GAUGE);
-
-        this.value = value;
+    public static DebugEvent getClusterDebugEvent() {
+        return clusterEvent;
     }
 
-    public Object getValue() {
-        return value;
+    public static DebugEvent getLocalDebugEvent() {
+        return localEvent;
     }
 
-    public String getFormattedValue() {
-        if (value instanceof Number) {
-            return df.format(value);
-        }
-        return "";
+    public static void setClusterDebugEvent(DebugEvent event) {
+        DebugEventHolder.clusterEvent = event;
+    }
+
+    public static void setLocalDebugEvent(DebugEvent event) {
+        DebugEventHolder.localEvent = event;
     }
 }

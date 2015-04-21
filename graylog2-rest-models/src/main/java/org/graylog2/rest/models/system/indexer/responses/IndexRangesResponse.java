@@ -14,33 +14,13 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog2.restclient.lib.metrics;
+package org.graylog2.rest.models.system.indexer.responses;
 
-import java.text.DecimalFormat;
+import java.util.List;
 
-/**
- * @author Lennart Koopmann <lennart@torch.sh>
- */
-public class Gauge extends Metric {
+public class IndexRangesResponse {
 
-    private final Object value;
-    DecimalFormat df = new DecimalFormat("#.##");
+    public List<IndexRangeSummary> ranges;
+    public int total;
 
-
-    public Gauge(Object value) {
-        super(MetricType.GAUGE);
-
-        this.value = value;
-    }
-
-    public Object getValue() {
-        return value;
-    }
-
-    public String getFormattedValue() {
-        if (value instanceof Number) {
-            return df.format(value);
-        }
-        return "";
-    }
 }

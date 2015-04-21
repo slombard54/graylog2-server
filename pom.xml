@@ -720,12 +720,11 @@
                 <version>1.6.2</version>
                 <scope>test</scope>
             </dependency>
-
             <dependency>
-                <groupId>org.graylog.telemetry</groupId>
-                <artifactId>graylog-telemetry-plugin</artifactId>
-                <version>1.0.1</version>
-                <scope>provided</scope>
+                <groupId>com.jayway.awaitility</groupId>
+                <artifactId>awaitility</artifactId>
+                <version>1.6.3</version>
+                <scope>test</scope>
             </dependency>
         </dependencies>
     </dependencyManagement>

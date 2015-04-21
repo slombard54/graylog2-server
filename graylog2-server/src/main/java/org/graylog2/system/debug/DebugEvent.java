@@ -14,36 +14,35 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog2.rest.models.system.indexer.responses;
+package org.graylog2.system.debug;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
-import javax.annotation.Nullable;
-
-@AutoValue
 @JsonAutoDetect
-public abstract class IndexRangeSummary {
-    @JsonProperty("index")
-    public abstract String indexName();
+@AutoValue
+public abstract class DebugEvent {
+    @JsonProperty
+    public abstract String nodeId();
 
-    @Nullable @JsonProperty("calculated_at")
-    public abstract DateTime calculatedAt();
+    @JsonProperty
+    public abstract DateTime date();
 
-    @JsonProperty("starts")
-    public abstract DateTime start();
-
-    @JsonProperty("calculation_took_ms")
-    public abstract int calculationTookMs();
+    @JsonProperty
+    public abstract String text();
 
     @JsonCreator
-    public static IndexRangeSummary create(@JsonProperty("index") String indexName,
-                                           @Nullable @JsonProperty("calculated_at") DateTime calculatedAt,
-                                           @JsonProperty("starts") DateTime start,
-                                           @JsonProperty("calculation_took_ms") int calculationTookMs) {
-        return new AutoValue_IndexRangeSummary(indexName, calculatedAt, start, calculationTookMs);
+    public static DebugEvent create(@JsonProperty("node_id") String nodeId,
+                                    @JsonProperty("date") DateTime date,
+                                    @JsonProperty("text") String text) {
+        return new AutoValue_DebugEvent(nodeId, date, text);
+    }
+
+    public static DebugEvent create(String nodeId, String text) {
+        return create(nodeId, DateTime.now(DateTimeZone.UTC), text);
     }
 }

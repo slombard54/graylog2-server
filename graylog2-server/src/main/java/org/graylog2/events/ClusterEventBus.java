@@ -14,16 +14,20 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog2.restclient.models.api.responses.system.indices;
+package org.graylog2.events;
 
-import java.util.List;
+import com.google.inject.BindingAnnotation;
 
-/**
- * @author Lennart Koopmann <lennart@torch.sh>
- */
-public class IndexRangesResponse {
+import java.lang.annotation.Retention;
+import java.lang.annotation.Target;
 
-    public List<IndexRangeSummary> ranges;
-    public int total;
+import static java.lang.annotation.ElementType.FIELD;
+import static java.lang.annotation.ElementType.METHOD;
+import static java.lang.annotation.ElementType.PARAMETER;
+import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
+@BindingAnnotation
+@Target({FIELD, PARAMETER, METHOD})
+@Retention(RUNTIME)
+public @interface ClusterEventBus {
 }
