@@ -20,27 +20,26 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package org.graylog2.plugin.streams;
+package org.graylog2.plugin.cluster;
 
-import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import org.graylog2.plugin.database.Persisted;
+/**
+ * Service to save and retrieve cluster configuration beans.
+ */
+public interface ClusterConfigService {
+    /**
+     * Retrieve Java class of a certain type from the cluster configuration.
+     *
+     * @param type The {@link Class} of the Java configuration bean to retrieve.
+     * @param <T>  The type of the Java configuration bean.
+     * @return An instance of the requested type or {@code null} if it couldn't be retrieved.
+     */
+    <T> T get(Class<T> type);
 
-import java.util.Date;
-import java.util.Map;
-
-@JsonAutoDetect
-public interface Output {
-    String getId();
-
-    String getTitle();
-
-    String getType();
-
-    String getCreatorUserId();
-
-    Map<String, Object> getConfiguration();
-
-    Date getCreatedAt();
-
-    String getContentPack();
+    /**
+     * Write a configuration bean to the cluster configuration.
+     *
+     * @param payload The object to write to the cluster configuration. Must be serializable by Jackson!
+     * @param <T>     The type of the Java configuration bean.
+     */
+    <T> void write(T payload);
 }

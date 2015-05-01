@@ -20,27 +20,21 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
  * THE SOFTWARE.
  */
-package org.graylog2.plugin.streams;
+package org.graylog2.plugin.cluster;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
-import org.graylog2.plugin.database.Persisted;
-
-import java.util.Date;
-import java.util.Map;
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.auto.value.AutoValue;
 
 @JsonAutoDetect
-public interface Output {
-    String getId();
+@AutoValue
+public abstract class ClusterId {
+    @JsonProperty
+    public abstract String clusterId();
 
-    String getTitle();
-
-    String getType();
-
-    String getCreatorUserId();
-
-    Map<String, Object> getConfiguration();
-
-    Date getCreatedAt();
-
-    String getContentPack();
+    @JsonCreator
+    public static ClusterId create(@JsonProperty("cluster_id") String clusterId) {
+        return new AutoValue_ClusterId(clusterId);
+    }
 }

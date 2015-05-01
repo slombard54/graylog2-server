@@ -33,6 +33,7 @@ import com.google.inject.AbstractModule;
 import com.google.inject.Guice;
 import com.google.inject.Injector;
 import com.google.inject.Scopes;
+import com.google.inject.Stage;
 import org.apache.log4j.Level;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
 import org.elasticsearch.action.bulk.BulkRequestBuilder;
@@ -47,6 +48,7 @@ import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.search.SearchHit;
+import org.graylog2.bindings.providers.EsClientProvider;
 import org.graylog2.bindings.providers.EsNodeProvider;
 import org.graylog2.configuration.ElasticsearchConfiguration;
 import org.graylog2.plugin.Tools;
@@ -138,6 +140,7 @@ public class ESTimestampFixup {
         protected void configure() {
             bind(Configuration.class).toInstance(configuration);
             bind(Node.class).toProvider(EsNodeProvider.class).in(Scopes.SINGLETON);
+            bind(Client.class).toProvider(EsClientProvider.class).in(Scopes.SINGLETON);
         }
     }
 
@@ -167,7 +170,7 @@ public class ESTimestampFixup {
         final Configuration configuration = readConfiguration(jadConfig, commandLineOptions);
 
         final GuiceInstantiationService instantiationService = new GuiceInstantiationService();
-        final Injector injector = Guice.createInjector(new Bindings(configuration));
+        final Injector injector = Guice.createInjector(Stage.PRODUCTION, new Bindings(configuration));
 
         instantiationService.setInjector(injector);
 

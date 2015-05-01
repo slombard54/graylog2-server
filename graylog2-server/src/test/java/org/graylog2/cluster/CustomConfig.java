@@ -14,20 +14,8 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog2.alarmcallbacks;
+package org.graylog2.cluster;
 
-import org.joda.time.DateTime;
-
-import java.util.Map;
-
-/**
- * @author Dennis Oelkers <dennis@torch.sh>
- */
-public interface AlarmCallbackConfiguration {
-    String getId();
-    String getStreamId();
-    String getType();
-    Map<String, Object> getConfiguration();
-    DateTime getCreatedAt();
-    String getCreatorUserId();
+public class CustomConfig {
+    public String text;
 }
