@@ -38,10 +38,10 @@ public interface AlertCondition {
     String getDescription();
 
     /**
-     * The limited list of internal message objects that matched the alert.
-     * @see org.graylog2.plugin.alarms.AlertCondition.CheckResult#getMatchingMessages()
-     * @return list of Message objects
-     */
+      * The limited list of internal message objects that matched the alert.
+      * @see org.graylog2.plugin.alarms.AlertCondition.CheckResult#getMatchingMessages()
+      * @return list of Message objects
+      */
     @Deprecated
     @JsonIgnore
     List<Message> getSearchHits();
@@ -62,7 +62,7 @@ public interface AlertCondition {
 
     String getTypeString();
 
-    public interface CheckResult {
+    interface CheckResult {
         boolean isTriggered();
         String getResultDescription();
         AlertCondition getTriggeredCondition();

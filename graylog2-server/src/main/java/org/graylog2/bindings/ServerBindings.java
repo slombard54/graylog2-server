@@ -28,6 +28,7 @@ import org.elasticsearch.node.Node;
 import org.graylog2.Configuration;
 import org.graylog2.alerts.AlertSender;
 import org.graylog2.alerts.FormattedEmailAlertSender;
+import org.graylog2.alerts.types.FieldContentValueAlertCondition;
 import org.graylog2.alerts.types.FieldValueAlertCondition;
 import org.graylog2.alerts.types.MessageCountAlertCondition;
 import org.graylog2.bindings.providers.BundleExporterProvider;
@@ -46,6 +47,7 @@ import org.graylog2.bindings.providers.SystemJobManagerProvider;
 import org.graylog2.buffers.processors.ServerProcessBufferProcessor;
 import org.graylog2.bundles.BundleService;
 import org.graylog2.cluster.ClusterConfigServiceImpl;
+import org.graylog2.dashboards.widgets.WidgetCacheTime;
 import org.graylog2.database.MongoConnection;
 import org.graylog2.events.ClusterEventBus;
 import org.graylog2.filters.FilterService;
@@ -62,7 +64,6 @@ import org.graylog2.jersey.container.netty.SecurityContextFactory;
 import org.graylog2.plugin.BaseConfiguration;
 import org.graylog2.plugin.PluginMetaData;
 import org.graylog2.plugin.RulesEngine;
-import org.graylog2.plugin.ServerStatus;
 import org.graylog2.plugin.cluster.ClusterConfigService;
 import org.graylog2.plugin.indexer.rotation.RotationStrategy;
 import org.graylog2.rest.NotFoundExceptionMapper;
@@ -95,17 +96,14 @@ import org.graylog2.system.stats.ClusterStatsModule;
 import javax.ws.rs.container.ContainerResponseFilter;
 import javax.ws.rs.container.DynamicFeature;
 import javax.ws.rs.ext.ExceptionMapper;
-import java.util.Set;
 
 import static com.google.inject.name.Names.named;
 
 public class ServerBindings extends AbstractModule {
     private final Configuration configuration;
-    private final Set<ServerStatus.Capability> capabilities;
 
-    public ServerBindings(Configuration configuration, Set<ServerStatus.Capability> capabilities) {
+    public ServerBindings(Configuration configuration) {
         this.configuration = configuration;
-        this.capabilities = capabilities;
     }
 
     @Override
@@ -137,6 +135,8 @@ public class ServerBindings extends AbstractModule {
         install(new FactoryModuleBuilder().build(LdapSettingsImpl.Factory.class));
         install(new FactoryModuleBuilder().build(FieldValueAlertCondition.Factory.class));
         install(new FactoryModuleBuilder().build(MessageCountAlertCondition.Factory.class));
+        install(new FactoryModuleBuilder().build(FieldContentValueAlertCondition.Factory.class));
+        install(new FactoryModuleBuilder().build(WidgetCacheTime.Factory.class));
     }
 
     private void bindSingletons() {
@@ -144,13 +144,6 @@ public class ServerBindings extends AbstractModule {
         bind(BaseConfiguration.class).toInstance(configuration);
 
         bind(MongoConnection.class).toProvider(MongoConnectionProvider.class);
-
-        Multibinder<ServerStatus.Capability> capabilityBinder = Multibinder.newSetBinder(binder(), ServerStatus.Capability.class);
-        for (ServerStatus.Capability capability : capabilities) {
-            capabilityBinder.addBinding().toInstance(capability);
-        }
-
-        bind(ServerStatus.class).in(Scopes.SINGLETON);
 
         if (configuration.isMessageJournalEnabled()) {
             install(new KafkaJournalModule());
@@ -164,7 +157,7 @@ public class ServerBindings extends AbstractModule {
         bind(RulesEngine.class).toProvider(RulesEngineProvider.class);
         bind(LdapConnector.class).toProvider(LdapConnectorProvider.class);
         bind(LdapUserAuthenticator.class).toProvider(LdapUserAuthenticatorProvider.class);
-        bind(DefaultSecurityManager.class).toProvider(DefaultSecurityManagerProvider.class);
+        bind(DefaultSecurityManager.class).toProvider(DefaultSecurityManagerProvider.class).asEagerSingleton();
         bind(SystemJobFactory.class).toProvider(SystemJobFactoryProvider.class);
         bind(GracefulShutdown.class).in(Scopes.SINGLETON);
         bind(BundleService.class).in(Scopes.SINGLETON);

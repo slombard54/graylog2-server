@@ -18,6 +18,7 @@ package org.graylog2;
 
 import com.github.joschi.jadconfig.Parameter;
 import com.github.joschi.jadconfig.util.Duration;
+import com.github.joschi.jadconfig.validators.PositiveDurationValidator;
 import com.github.joschi.jadconfig.validators.PositiveIntegerValidator;
 import com.github.joschi.jadconfig.validators.PositiveLongValidator;
 import org.graylog2.plugin.BaseConfiguration;
@@ -123,6 +124,15 @@ public class Configuration extends BaseConfiguration {
 
     @Parameter(value = "default_message_output_class")
     private String defaultMessageOutputClass = "";
+
+    @Parameter(value = "collector_expiration_threshold", validator = PositiveDurationValidator.class)
+    private Duration collectorExpirationThreshold = Duration.days(14);
+
+    @Parameter(value = "collector_inactive_threshold", validator = PositiveDurationValidator.class)
+    private Duration collectorInactiveThreshold = Duration.minutes(1);
+
+    @Parameter(value = "dashboard_widget_default_cache_time", validator = PositiveDurationValidator.class)
+    private Duration dashboardWidgetDefaultCacheTime = Duration.seconds(10l);
 
     public boolean isMaster() {
         return isMaster;
@@ -247,5 +257,17 @@ public class Configuration extends BaseConfiguration {
 
     public String getDefaultMessageOutputClass() {
         return defaultMessageOutputClass;
+    }
+
+    public Duration getCollectorExpirationThreshold() {
+        return collectorExpirationThreshold;
+    }
+
+    public Duration getCollectorInactiveThreshold() {
+        return collectorInactiveThreshold;
+    }
+
+    public Duration getDashboardWidgetDefaultCacheTime() {
+        return dashboardWidgetDefaultCacheTime;
     }
 }

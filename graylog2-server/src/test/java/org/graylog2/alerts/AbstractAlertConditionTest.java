@@ -72,7 +72,7 @@ public class AbstractAlertConditionTest extends AlertConditionTest {
             }
 
             @Override
-            protected CheckResult runCheck() {
+            protected AlertCondition.CheckResult runCheck() {
                 return null;
             }
 

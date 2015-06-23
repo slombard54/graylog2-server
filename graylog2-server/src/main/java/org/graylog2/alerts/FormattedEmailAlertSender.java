@@ -18,10 +18,12 @@ package org.graylog2.alerts;
 
 import com.floreysoft.jmte.Engine;
 import org.graylog2.configuration.EmailConfiguration;
+import org.graylog2.notifications.NotificationService;
 import org.graylog2.plugin.Message;
 import org.graylog2.plugin.alarms.AlertCondition;
 import org.graylog2.plugin.configuration.Configuration;
 import org.graylog2.plugin.streams.Stream;
+import org.graylog2.plugin.system.NodeId;
 import org.graylog2.shared.users.UserService;
 import org.graylog2.streams.StreamRuleService;
 
@@ -31,41 +33,52 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import static com.google.common.base.MoreObjects.firstNonNull;
+
 public class FormattedEmailAlertSender extends StaticEmailAlertSender implements AlertSender {
     public static final String bodyTemplate = "##########\n" +
+            "Alert Description: ${check_result.resultDescription}\n" +
             "Date: ${check_result.triggeredAt}\n" +
             "Stream ID: ${stream.id}\n" +
             "Stream title: ${stream.title}\n" +
+            "Stream description: ${stream.description}\n" +
             "${if stream_url}Stream URL: ${stream_url}${end}\n" +
             "\n" +
             "Triggered condition: ${check_result.triggeredCondition}\n" +
             "##########\n\n" +
+            "${if backlog}" +
             "Last messages accounting for this alert:\n" +
-            "${if backlog_size > 0}" +
-            "${foreach backlog message}\n" +
-            "${message}\n" +
-            "${end}\n" +
-            "${else}<No backlog.>${end}\n" +
+            "${foreach backlog message}" +
+            "${message}\n\n" +
+            "${end}" +
+            "${else}" +
+            "<No backlog>\n" +
+            "${end}" +
             "\n";
 
     private final Engine engine = new Engine();
     private Configuration pluginConfig;
 
     @Inject
-    public FormattedEmailAlertSender(EmailConfiguration configuration, StreamRuleService streamRuleService, UserService userService) {
-        super(configuration, streamRuleService, userService);
+    public FormattedEmailAlertSender(EmailConfiguration configuration,
+                                     StreamRuleService streamRuleService,
+                                     UserService userService,
+                                     NotificationService notificationService,
+                                     NodeId nodeId) {
+        super(configuration, streamRuleService, userService, notificationService, nodeId);
     }
 
     @Override
     public void initialize(Configuration configuration) {
         this.pluginConfig = configuration;
+        super.initialize(configuration);
     }
 
     @Override
     protected String buildSubject(Stream stream, AlertCondition.CheckResult checkResult, List<Message> backlog) {
         final String template;
         if (pluginConfig == null || pluginConfig.getString("subject") == null) {
-            template = "Graylog alert for stream: ${stream.title}";
+            template = "Graylog alert for stream: ${stream.title}: ${check_result.resultDescription}";
         } else {
             template = pluginConfig.getString("subject");
         }
@@ -95,13 +108,10 @@ public class FormattedEmailAlertSender extends StaticEmailAlertSender implements
         model.put("check_result", checkResult);
         model.put("stream_url", buildStreamDetailsURL(configuration.getWebInterfaceUri(), checkResult, stream));
 
-        if (backlog != null) {
-            model.put("backlog", backlog);
-            model.put("backlog_size", backlog.size());
-        } else {
-            model.put("backlog", Collections.<Message>emptyList());
-            model.put("backlog_size", 0);
-        }
+        final List<Message> messages = firstNonNull(backlog, Collections.<Message>emptyList());
+        model.put("backlog", messages);
+        model.put("backlog_size", messages.size());
+
         return model;
     }
 }

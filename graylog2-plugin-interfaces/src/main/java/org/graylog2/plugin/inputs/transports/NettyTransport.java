@@ -52,12 +52,14 @@ import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelHandler;
 import org.jboss.netty.channel.socket.DatagramChannel;
+import org.jboss.netty.channel.socket.DefaultDatagramChannelConfig;
 import org.jboss.netty.channel.socket.ServerSocketChannelConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import javax.annotation.Nullable;
 import java.net.InetSocketAddress;
+import java.net.SocketAddress;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.Callable;
@@ -131,23 +133,28 @@ public abstract class NettyTransport implements Transport {
 
         try {
             bootstrap = getBootstrap();
-
             bootstrap.setPipelineFactory(getPipelineFactory(handlerList));
 
             // sigh, bindable bootstraps do not share a common interface
+            int receiveBufferSize;
             if (bootstrap instanceof ConnectionlessBootstrap) {
                 acceptChannel = ((ConnectionlessBootstrap) bootstrap).bind(socketAddress);
+
+                final DefaultDatagramChannelConfig channelConfig = (DefaultDatagramChannelConfig) acceptChannel.getConfig();
+                receiveBufferSize = channelConfig.getReceiveBufferSize();
             } else if (bootstrap instanceof ServerBootstrap) {
                 acceptChannel = ((ServerBootstrap) bootstrap).bind(socketAddress);
 
-
                 final ServerSocketChannelConfig channelConfig = (ServerSocketChannelConfig) acceptChannel.getConfig();
-                if(channelConfig.getReceiveBufferSize() != getRecvBufferSize()) {
-                    log.warn("receiveBufferSize (SO_RCVBUF) for {} should be {} but is {}.", acceptChannel, getRecvBufferSize(), channelConfig.getReceiveBufferSize());
-                }
+                receiveBufferSize = channelConfig.getReceiveBufferSize();
             } else {
-                log.error("Unknown netty bootstrap class returned: {}. Cannot safely bind.", bootstrap);
+                log.error("Unknown Netty bootstrap class returned: {}. Cannot safely bind.", bootstrap);
                 throw new IllegalStateException("Unknown netty bootstrap class returned: " + bootstrap + ". Cannot safely bind.");
+            }
+
+            if (receiveBufferSize != getRecvBufferSize()) {
+                log.warn("receiveBufferSize (SO_RCVBUF) for input {} should be {} but is {}.",
+                        input, getRecvBufferSize(), receiveBufferSize);
             }
         } catch (Exception e) {
             throw new MisfireException(e);
@@ -179,8 +186,8 @@ public abstract class NettyTransport implements Transport {
      * <p/>
      * Some common use cases are to add SSL/TLS, connection counters or throttling traffic shapers.
      *
-     * @return the list of initial channelhandlers to add to the {@link org.jboss.netty.channel.ChannelPipelineFactory}
      * @param input
+     * @return the list of initial channelhandlers to add to the {@link org.jboss.netty.channel.ChannelPipelineFactory}
      */
     protected LinkedHashMap<String, Callable<? extends ChannelHandler>> getBaseChannelHandlers(final MessageInput input) {
         LinkedHashMap<String, Callable<? extends ChannelHandler>> handlerList = Maps.newLinkedHashMap();
@@ -206,8 +213,8 @@ public abstract class NettyTransport implements Transport {
      * <p/>
      * One valid use case would be to insert debug handlers in the middle of the list, though.
      *
-     * @return the list of channel handlers at the end of the pipeline
      * @param input
+     * @return the list of channel handlers at the end of the pipeline
      */
     protected LinkedHashMap<String, Callable<? extends ChannelHandler>> getFinalChannelHandlers(final MessageInput input) {
         LinkedHashMap<String, Callable<? extends ChannelHandler>> handlerList = Maps.newLinkedHashMap();
@@ -233,6 +240,19 @@ public abstract class NettyTransport implements Transport {
 
     protected long getRecvBufferSize() {
         return recvBufferSize;
+    }
+
+    /**
+     * Get the local socket address this transport is listening on after being launched.
+     *
+     * @return the listening address of this transport or {@code null} if the transport hasn't been launched yet.
+     */
+    public SocketAddress getLocalAddress() {
+        if (acceptChannel == null || !acceptChannel.isBound()) {
+            return null;
+        }
+
+        return acceptChannel.getLocalAddress();
     }
 
     @Override
@@ -265,7 +285,7 @@ public abstract class NettyTransport implements Transport {
                 if (completeMessage != null) {
                     log.debug("Message aggregation completion, forwarding {}", completeMessage);
                     fireMessageReceived(ctx, completeMessage);
-                } else if(result.isValid()) {
+                } else if (result.isValid()) {
                     log.debug("More chunks necessary to complete this message");
                 } else {
                     invalidChunksMeter.mark();

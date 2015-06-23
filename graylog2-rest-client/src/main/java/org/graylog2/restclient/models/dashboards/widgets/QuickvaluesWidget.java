@@ -25,22 +25,25 @@ import java.util.Map;
 public class QuickvaluesWidget extends DashboardWidget {
 
     private static final int DEFAULT_WIDTH = 1;
-    private static final int DEFAULT_HEIGHT = 2;
+    private static final int DEFAULT_HEIGHT_SINGLE_REPRESENTATION = 2;
+    private static final int DEFAULT_HEIGHT_MULTIPLE_REPRESENTATIONS = 3;
 
     private final String field;
     private final String streamId;
 
     private final Boolean showPieChart;
+    private final Boolean showDataTable;
 
-    public QuickvaluesWidget(Dashboard dashboard, String query, TimeRange timerange, String field, String description, String streamId) {
-        this(dashboard, null, description, streamId, 0, query, timerange, field, false, null);
+    public QuickvaluesWidget(Dashboard dashboard, String query, TimeRange timerange, String field, String description, boolean showPieChart, boolean showDataTable, String streamId) {
+        this(dashboard, null, description, streamId, 0, query, timerange, field, showPieChart, showDataTable, null);
     }
 
-    public QuickvaluesWidget(Dashboard dashboard, String id, String description, String streamId, int cacheTime, String query, TimeRange timerange, String field, boolean showPieChart, String creatorUserId) {
+    public QuickvaluesWidget(Dashboard dashboard, String id, String description, String streamId, int cacheTime, String query, TimeRange timerange, String field, boolean showPieChart, boolean showDataTable, String creatorUserId) {
         super(Type.QUICKVALUES, id, description, cacheTime, dashboard, creatorUserId, query, timerange);
 
         this.field = field;
         this.showPieChart = showPieChart;
+        this.showDataTable = showDataTable;
 
         if (streamId != null && !streamId.isEmpty()) {
             this.streamId = streamId;
@@ -57,8 +60,13 @@ public class QuickvaluesWidget extends DashboardWidget {
         config.put("stream_id", streamId);
         config.put("field", field);
         config.put("show_pie_chart", showPieChart);
+        config.put("show_data_table", showDataTable);
 
         return config;
+    }
+
+    private int getDefaultHeight() {
+        return (showDataTable && showPieChart) ? DEFAULT_HEIGHT_MULTIPLE_REPRESENTATIONS : DEFAULT_HEIGHT_SINGLE_REPRESENTATION;
     }
 
     @Override
@@ -70,7 +78,7 @@ public class QuickvaluesWidget extends DashboardWidget {
     @Override
     public int getHeight() {
         int storedHeight = super.getHeight();
-        return storedHeight == 0 ? DEFAULT_HEIGHT : storedHeight;
+        return storedHeight == 0 ? this.getDefaultHeight() : storedHeight;
     }
 
     @Override

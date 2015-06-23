@@ -50,9 +50,7 @@ import kafka.utils.Utils;
 import org.graylog2.plugin.GlobalMetricNames;
 import org.graylog2.plugin.ThrottleState;
 import org.graylog2.shared.metrics.HdrTimer;
-import org.joda.time.DateTime;
 import org.joda.time.DateTimeUtils;
-import org.joda.time.DateTimeZone;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,6 +70,7 @@ import java.io.SyncFailedException;
 import java.nio.channels.ClosedByInterruptException;
 import java.nio.file.AccessDeniedException;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -87,7 +86,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static com.codahale.metrics.MetricRegistry.name;
 import static com.github.joschi.jadconfig.util.Size.megabytes;
-import static java.util.concurrent.TimeUnit.*;
+import static java.util.concurrent.TimeUnit.DAYS;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+import static java.util.concurrent.TimeUnit.MINUTES;
+import static java.util.concurrent.TimeUnit.NANOSECONDS;
+import static java.util.concurrent.TimeUnit.SECONDS;
 import static org.graylog2.plugin.Tools.bytesToHex;
 
 @Singleton
@@ -124,8 +127,8 @@ public class KafkaJournal extends AbstractIdleService implements Journal {
 
     private final Timer readTime;
     private final KafkaScheduler kafkaScheduler;
-    private final Meter messagesWritten;
-    private final Meter messagesRead;
+    private final Meter writtenMessages;
+    private final Meter readMessages;
 
     private final OffsetFileFlusher offsetFlusher;
     private final DirtyLogFlusher dirtyLogFlusher;
@@ -153,8 +156,8 @@ public class KafkaJournal extends AbstractIdleService implements Journal {
                         MetricRegistry metricRegistry) {
         this.scheduler = scheduler;
 
-        this.messagesWritten = metricRegistry.meter(name(this.getClass(), "messagesWritten"));
-        this.messagesRead = metricRegistry.meter(name(this.getClass(), "messagesRead"));
+        this.writtenMessages = metricRegistry.meter(name(this.getClass(), "writtenMessages"));
+        this.readMessages = metricRegistry.meter(name(this.getClass(), "readMessages"));
 
         registerUncommittedGauge(metricRegistry, name(this.getClass(), "uncommittedMessages"));
 
@@ -338,14 +341,15 @@ public class KafkaJournal extends AbstractIdleService implements Journal {
                 return kafkaLog.lastFlushTime();
             }
         });
-        metricRegistry.register(GlobalMetricNames.JOURNAL_OLDEST_SEGMENT, new Gauge<DateTime>() {
+        metricRegistry.register(GlobalMetricNames.JOURNAL_OLDEST_SEGMENT, new Gauge<Date>() {
             @Override
-            public DateTime getValue() {
+            public Date getValue() {
                 long oldestSegment = Long.MAX_VALUE;
                 for (final LogSegment segment : getSegments()) {
                     oldestSegment = Math.min(oldestSegment, segment.created());
                 }
-                return new DateTime(oldestSegment, DateTimeZone.UTC);
+
+                return new Date(oldestSegment);
             }
         });
     }
@@ -393,7 +397,7 @@ public class KafkaJournal extends AbstractIdleService implements Journal {
             long lastWriteOffset = appendInfo.lastOffset();
             LOG.debug("Wrote {} messages to journal: {} bytes, log position {} to {}",
                     entries.size(), payloadSize, appendInfo.firstOffset(), lastWriteOffset);
-            messagesWritten.mark(entries.size());
+            writtenMessages.mark(entries.size());
             return lastWriteOffset;
         }
     }
@@ -495,7 +499,7 @@ public class KafkaJournal extends AbstractIdleService implements Journal {
             }
 
         }
-        messagesRead.mark(messages.size());
+        readMessages.mark(messages.size());
         return messages;
     }
 
@@ -688,7 +692,7 @@ public class KafkaJournal extends AbstractIdleService implements Journal {
     public ThrottleState getThrottleState() {
         return throttleState.get();
     }
-    
+
     public void setThrottleState(ThrottleState state) {
         throttleState.set(state);
     }

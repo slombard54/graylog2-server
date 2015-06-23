@@ -27,6 +27,7 @@ import com.codahale.metrics.Meter;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.MetricSet;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.google.common.base.MoreObjects;
 import com.google.common.collect.Maps;
 import org.graylog2.plugin.AbstractDescriptor;
 import org.graylog2.plugin.GlobalMetricNames;
@@ -163,9 +164,14 @@ public abstract class MessageInput implements Stoppable {
 
     public void stop() {
         transport.stop();
+        cleanupMetrics();
     }
 
     public void terminate() {
+        cleanupMetrics();
+    }
+
+    private void cleanupMetrics() {
         if (localRegistry != null && localRegistry.getMetrics() != null)
             for (String metricName : localRegistry.getMetrics().keySet())
                 metricRegistry.remove(getUniqueReadableId() + "." + metricName);
@@ -182,8 +188,6 @@ public abstract class MessageInput implements Stoppable {
     public Descriptor getDescriptor() {
         return descriptor;
     }
-
-    ;
 
     public String getName() {
         return descriptor.getName();
@@ -393,5 +397,14 @@ public abstract class MessageInput implements Stoppable {
         protected Descriptor(String name, boolean exclusive, String linkToDocs) {
             super(name, exclusive, linkToDocs);
         }
+    }
+
+    @Override
+    public String toString() {
+        return MoreObjects.toStringHelper(this)
+                .add("title", getTitle())
+                .add("type", getType())
+                .add("nodeId", getNodeId())
+                .toString();
     }
 }

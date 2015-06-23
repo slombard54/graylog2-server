@@ -18,8 +18,10 @@ package org.graylog2.configuration;
 
 import com.github.joschi.jadconfig.Parameter;
 import com.github.joschi.jadconfig.converters.StringListConverter;
+import com.github.joschi.jadconfig.util.Duration;
 import com.github.joschi.jadconfig.validators.FileReadableValidator;
 import com.github.joschi.jadconfig.validators.InetPortValidator;
+import com.github.joschi.jadconfig.validators.PositiveDurationValidator;
 import com.github.joschi.jadconfig.validators.PositiveIntegerValidator;
 import com.github.joschi.jadconfig.validators.PositiveLongValidator;
 import org.joda.time.Period;
@@ -113,10 +115,16 @@ public class ElasticsearchConfiguration {
     private boolean disableIndexOptimization = false;
 
     @Parameter(value = "disable_index_range_calculation")
-    private boolean disableIndexRangeCalculation = false;
+    private boolean disableIndexRangeCalculation = true;
 
     @Parameter(value = "index_optimization_max_num_segments", validator = PositiveIntegerValidator.class)
     private int indexOptimizationMaxNumSegments = 1;
+
+    @Parameter(value = "elasticsearch_store_timestamps_as_doc_values")
+    private boolean storeTimestampsAsDocValues = true;
+
+    @Parameter(value = "elasticsearch_request_timeout", validator = PositiveDurationValidator.class)
+    private Duration requestTimeout = Duration.minutes(1L);
 
     public String getClusterName() {
         return clusterName;
@@ -244,5 +252,13 @@ public class ElasticsearchConfiguration {
 
     public String getPathData() {
         return pathData;
+    }
+
+    public boolean isStoreTimestampsAsDocValues() {
+        return storeTimestampsAsDocValues;
+    }
+
+    public Duration getRequestTimeout() {
+        return requestTimeout;
     }
 }

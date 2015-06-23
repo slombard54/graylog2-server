@@ -37,6 +37,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 
+import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkNotNull;
 
 public class ClusterConfigServiceImpl implements ClusterConfigService {
@@ -74,7 +75,7 @@ public class ClusterConfigServiceImpl implements ClusterConfigService {
     static DBCollection prepareCollection(final MongoConnection mongoConnection) {
         DBCollection coll = mongoConnection.getDatabase().getCollection(COLLECTION_NAME);
         coll.createIndex(DBSort.asc("type"), "unique_type", true);
-        coll.setWriteConcern(WriteConcern.MAJORITY);
+        coll.setWriteConcern(WriteConcern.FSYNCED);
 
         return coll;
     }
@@ -92,13 +93,13 @@ public class ClusterConfigServiceImpl implements ClusterConfigService {
     public <T> T get(Class<T> type) {
         ClusterConfig config = dbCollection.findOne(DBQuery.is("type", type.getCanonicalName()));
 
-        if(config == null) {
+        if (config == null) {
             LOG.warn("Couldn't find cluster config of type {}", type.getCanonicalName());
             return null;
         }
 
         T result = extractPayload(config.payload(), type);
-        if(result == null) {
+        if (result == null) {
             LOG.error("Couldn't extract payload from cluster config (type: {})", type.getCanonicalName());
         }
 
@@ -106,8 +107,13 @@ public class ClusterConfigServiceImpl implements ClusterConfigService {
     }
 
     @Override
+    public <T> T getOrDefault(Class<T> type, T defaultValue) {
+        return firstNonNull(get(type), defaultValue);
+    }
+
+    @Override
     public <T> void write(T payload) {
-        if(payload == null) {
+        if (payload == null) {
             LOG.debug("Payload was null. Skipping.");
             return;
         }
@@ -115,7 +121,7 @@ public class ClusterConfigServiceImpl implements ClusterConfigService {
         String canonicalClassName = AutoValueUtils.getCanonicalName(payload.getClass());
         ClusterConfig clusterConfig = ClusterConfig.create(canonicalClassName, payload, nodeId.toString());
 
-        dbCollection.update(DBQuery.is("type", canonicalClassName), clusterConfig, true, false, WriteConcern.MAJORITY);
+        dbCollection.update(DBQuery.is("type", canonicalClassName), clusterConfig, true, false, WriteConcern.FSYNCED);
 
         ClusterConfigChangedEvent event = ClusterConfigChangedEvent.create(
                 DateTime.now(DateTimeZone.UTC), nodeId.toString(), canonicalClassName);
