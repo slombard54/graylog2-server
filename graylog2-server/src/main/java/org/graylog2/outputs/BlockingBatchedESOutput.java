@@ -34,6 +34,7 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.util.List;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -106,10 +107,10 @@ public class BlockingBatchedESOutput extends ElasticSearchOutput {
     }
 
     private void flush(List<Message> messages) {
-        if (!cluster.isConnectedAndHealthy()) {
+        if (!cluster.isConnected() || !cluster.isHealthy()) {
             try {
                 cluster.waitForConnectedAndHealthy();
-            } catch (InterruptedException e) {
+            } catch (TimeoutException | InterruptedException e) {
                 log.warn("Error while waiting for healthy Elasticsearch cluster. Not flushing.", e);
                 return;
             }
@@ -135,7 +136,7 @@ public class BlockingBatchedESOutput extends ElasticSearchOutput {
     }
 
     public void forceFlushIfTimedout() {
-        if (!cluster.isConnectedAndHealthy()) {
+        if (!cluster.isConnected() || !cluster.isHealthy()) {
             // do not actually try to flush, because that will block until the cluster comes back.
             // simply check and return.
             log.debug("Cluster unavailable, but not blocking for periodic flush attempt. This will try again.");

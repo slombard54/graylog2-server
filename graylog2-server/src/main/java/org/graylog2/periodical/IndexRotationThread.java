@@ -16,12 +16,11 @@
  */
 package org.graylog2.periodical;
 
-import javax.inject.Inject;
-import javax.inject.Provider;
+import org.elasticsearch.action.admin.cluster.health.ClusterHealthStatus;
 import org.graylog2.indexer.Deflector;
 import org.graylog2.indexer.NoTargetIndexException;
+import org.graylog2.indexer.cluster.Cluster;
 import org.graylog2.indexer.indices.Indices;
-import org.graylog2.initializers.IndexerSetupService;
 import org.graylog2.notifications.Notification;
 import org.graylog2.notifications.NotificationService;
 import org.graylog2.plugin.indexer.rotation.RotationStrategy;
@@ -31,14 +30,16 @@ import org.graylog2.shared.system.activities.ActivityWriter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.inject.Inject;
+import javax.inject.Provider;
+
 public class IndexRotationThread extends Periodical {
-    
     private static final Logger LOG = LoggerFactory.getLogger(IndexRotationThread.class);
 
     private NotificationService notificationService;
     private final Deflector deflector;
+    private final Cluster cluster;
     private final ActivityWriter activityWriter;
-    private final IndexerSetupService indexerSetupService;
     private final Indices indices;
     private final Provider<RotationStrategy> rotationStrategyProvider;
 
@@ -46,13 +47,13 @@ public class IndexRotationThread extends Periodical {
     public IndexRotationThread(NotificationService notificationService,
                                Indices indices,
                                Deflector deflector,
+                               Cluster cluster,
                                ActivityWriter activityWriter,
-                               IndexerSetupService indexerSetupService,
                                Provider<RotationStrategy> rotationStrategyProvider) {
         this.notificationService = notificationService;
         this.deflector = deflector;
+        this.cluster = cluster;
         this.activityWriter = activityWriter;
-        this.indexerSetupService = indexerSetupService;
         this.indices = indices;
         this.rotationStrategyProvider = rotationStrategyProvider;
     }
@@ -60,13 +61,15 @@ public class IndexRotationThread extends Periodical {
     @Override
     public void doRun() {
         // Point deflector to a new index if required.
-        try {
-            if (indexerSetupService.isRunning()) {
+        if (cluster.isConnected()) {
+            try {
                 checkAndRepair();
                 checkForRotation();
+            } catch (Exception e) {
+                LOG.error("Couldn't point deflector to a new index", e);
             }
-        } catch (Exception e) {
-            LOG.error("Couldn't point deflector to a new index", e);
+        } else {
+            LOG.debug("Elasticsearch cluster isn't healthy. Skipping index rotation.");
         }
     }
 
@@ -123,7 +126,11 @@ public class IndexRotationThread extends Periodical {
                     LOG.warn(msg);
                     activityWriter.write(new Activity(msg, IndexRotationThread.class));
 
-                    deflector.pointTo(shouldBeTarget, currentTarget);
+                    if (ClusterHealthStatus.RED == indices.waitForRecovery(shouldBeTarget)) {
+                        LOG.error("New target index for deflector didn't get healthy within timeout. Skipping deflector update.");
+                    } else {
+                        deflector.pointTo(shouldBeTarget, currentTarget);
+                    }
                 }
             } catch (NoTargetIndexException e) {
                 LOG.warn("Deflector is not up. Not trying to point to another index.");

@@ -14,30 +14,19 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog2.rest.resources.streams.requests;
+package org.graylog2.rest.models.alarmcallbacks;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
 import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.google.auto.value.AutoValue;
+import com.fasterxml.jackson.annotation.JsonSubTypes;
+import com.fasterxml.jackson.annotation.JsonTypeInfo;
 
-import java.util.List;
+import java.util.Map;
 
 @JsonAutoDetect
-@AutoValue
-@JsonIgnoreProperties(ignoreUnknown = true)
-public abstract class UpdateStreamRequest {
-    @JsonProperty
-    public abstract String title();
-
-    @JsonProperty
-    public abstract String description();
-
-    @JsonCreator
-    public static UpdateStreamRequest create(@JsonProperty("title") String title,
-                                             @JsonProperty("description") String description,
-                                             @JsonProperty("rules") List rules) {
-        return new AutoValue_UpdateStreamRequest(title, description);
-    }
+@JsonTypeInfo(use = JsonTypeInfo.Id.NAME, include = JsonTypeInfo.As.EXISTING_PROPERTY, property = "type")
+@JsonSubTypes({ @JsonSubTypes.Type(value = AlarmCallbackError.class, name = "error"),
+                @JsonSubTypes.Type(value = AlarmCallbackSuccess.class, name = "success") })
+public abstract class AlarmCallbackResult {
+    public abstract String type();
 }

@@ -17,6 +17,7 @@
 package org.graylog2.streams;
 
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
@@ -54,6 +55,7 @@ public class StreamImpl extends PersistedImpl implements Stream {
     public static final String FIELD_DISABLED = "disabled";
     public static final String FIELD_CREATED_AT = "created_at";
     public static final String FIELD_CREATOR_USER_ID = "creator_user_id";
+    public static final String FIELD_MATCHING_TYPE = "matching_type";
     public static final String EMBEDDED_ALERT_CONDITIONS = "alert_conditions";
 
     private final List<StreamRule> streamRules;
@@ -162,6 +164,7 @@ public class StreamImpl extends PersistedImpl implements Stream {
         result.put(FIELD_CREATED_AT, (Tools.getISO8601String((DateTime) fields.get(FIELD_CREATED_AT))));
         result.put(FIELD_RULES, streamRules);
         result.put(FIELD_OUTPUTS, outputs);
+        result.put(FIELD_MATCHING_TYPE, getMatchingType());
         return result;
     }
 
@@ -193,4 +196,20 @@ public class StreamImpl extends PersistedImpl implements Stream {
         return (Map<String, List<String>>) fields.get(FIELD_ALERT_RECEIVERS);
     }
 
+    @Override
+    public MatchingType getMatchingType() {
+        final String matchingTypeString = (String)fields.get(FIELD_MATCHING_TYPE);
+
+        if (matchingTypeString == null) {
+            return MatchingType.AND;
+        } else {
+            return MatchingType.valueOf(matchingTypeString);
+        }
+    }
+
+    @Override
+    public void setMatchingType(MatchingType matchingType) {
+        Preconditions.checkNotNull(matchingType);
+        fields.put(FIELD_MATCHING_TYPE, matchingType.toString());
+    }
 }

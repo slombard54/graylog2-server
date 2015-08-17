@@ -20,7 +20,6 @@ import com.codahale.metrics.Histogram;
 import com.codahale.metrics.MetricRegistry;
 import com.codahale.metrics.Timer;
 import com.google.common.collect.Sets;
-import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.search.SearchRequest;
 import org.elasticsearch.action.search.SearchRequestBuilder;
 import org.elasticsearch.action.search.SearchResponse;
@@ -33,17 +32,15 @@ import org.elasticsearch.index.query.FilterBuilders;
 import org.elasticsearch.index.query.QueryBuilder;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.index.query.QueryStringQueryBuilder;
-import org.elasticsearch.indices.IndexMissingException;
 import org.elasticsearch.search.SearchHit;
 import org.elasticsearch.search.aggregations.AggregationBuilders;
 import org.elasticsearch.search.aggregations.bucket.filter.Filter;
 import org.elasticsearch.search.aggregations.bucket.filter.FilterAggregationBuilder;
 import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogram;
+import org.elasticsearch.search.aggregations.bucket.histogram.DateHistogramBuilder;
 import org.elasticsearch.search.aggregations.bucket.missing.Missing;
 import org.elasticsearch.search.aggregations.bucket.terms.Terms;
-import org.elasticsearch.search.aggregations.metrics.max.Max;
-import org.elasticsearch.search.aggregations.metrics.min.Min;
-import org.elasticsearch.search.aggregations.metrics.stats.Stats;
+import org.elasticsearch.search.aggregations.metrics.cardinality.Cardinality;
 import org.elasticsearch.search.aggregations.metrics.stats.extended.ExtendedStats;
 import org.elasticsearch.search.sort.SortOrder;
 import org.graylog2.Configuration;
@@ -62,11 +59,7 @@ import org.graylog2.indexer.results.TermsResult;
 import org.graylog2.indexer.results.TermsStatsResult;
 import org.graylog2.indexer.searches.timeranges.TimeRange;
 import org.graylog2.indexer.searches.timeranges.TimeRanges;
-import org.graylog2.plugin.Tools;
-import org.joda.time.DateTime;
 import org.joda.time.Period;
-import org.joda.time.format.DateTimeFormat;
-import org.joda.time.format.DateTimeFormatter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -92,6 +85,7 @@ public class Searches {
     public static final String AGG_FILTER = "gl2_filter";
     public static final String AGG_HISTOGRAM = "gl2_histogram";
     public static final String AGG_EXTENDED_STATS = "gl2_extended_stats";
+    public static final String AGG_CARDINALITY = "gl2_field_cardinality";
 
     public enum TermsStatsOrder {
         TERM,
@@ -242,11 +236,13 @@ public class Searches {
     }
 
     public SearchResult search(SearchesConfig config) {
-        Set<IndexRange> indices = IndexHelper.determineAffectedIndicesWithRanges(indexRangeService, deflector, config.range());
+        Set<IndexRange> indices = IndexHelper.determineAffectedIndicesWithRanges(indexRangeService,
+                                                                                 deflector,
+                                                                                 config.range());
 
         Set<String> indexNames = Sets.newHashSet();
         for (IndexRange index : indices) {
-            indexNames.add(index.getIndexName());
+            indexNames.add(index.indexName());
         }
 
         SearchRequest request = searchRequest(config, indexNames).request();
@@ -388,6 +384,12 @@ public class Searches {
     }
 
     public FieldStatsResult fieldStats(String field, String query, String filter, TimeRange range) throws FieldTypeException {
+        // by default include the cardinality aggregation, as well.
+        return fieldStats(field, query, filter, range, true, false);
+    }
+
+    public FieldStatsResult fieldStats(String field, String query, String filter, TimeRange range, boolean includeCardinality, boolean onlyCardinality)
+            throws FieldTypeException {
         SearchRequestBuilder srb;
 
         if (filter == null) {
@@ -397,8 +399,13 @@ public class Searches {
         }
 
         FilterAggregationBuilder builder = AggregationBuilders.filter(AGG_FILTER)
-                .filter(standardFilters(range, filter))
-                .subAggregation(AggregationBuilders.extendedStats(AGG_EXTENDED_STATS).field(field));
+                .filter(standardFilters(range, filter));
+        if (!onlyCardinality) {
+            builder.subAggregation(AggregationBuilders.extendedStats(AGG_EXTENDED_STATS).field(field));
+        }
+        if (includeCardinality) {
+            builder.subAggregation(AggregationBuilders.cardinality(AGG_CARDINALITY).field(field));
+        }
 
         srb.addAggregation(builder);
 
@@ -415,6 +422,7 @@ public class Searches {
         final Filter f = r.getAggregations().get(AGG_FILTER);
         return new FieldStatsResult(
                 (ExtendedStats) f.getAggregations().get(AGG_EXTENDED_STATS),
+                (Cardinality) f.getAggregations().get(AGG_CARDINALITY),
                 r.getHits(),
                 query,
                 request.source(),
@@ -456,14 +464,23 @@ public class Searches {
                 r.getTook());
     }
 
-    public HistogramResult fieldHistogram(String query, String field, DateHistogramInterval interval, String filter, TimeRange range) throws FieldTypeException {
+    public HistogramResult fieldHistogram(String query,
+                                          String field,
+                                          DateHistogramInterval interval,
+                                          String filter,
+                                          TimeRange range,
+                                          boolean includeCardinality) throws FieldTypeException {
+        final DateHistogramBuilder dateHistogramBuilder = AggregationBuilders.dateHistogram(AGG_HISTOGRAM)
+                .field("timestamp")
+                .subAggregation(AggregationBuilders.stats(AGG_STATS).field(field))
+                .interval(interval.toESInterval());
+
+        if (includeCardinality) {
+            dateHistogramBuilder.subAggregation(AggregationBuilders.cardinality(AGG_CARDINALITY).field(field));
+        }
+
         FilterAggregationBuilder builder = AggregationBuilders.filter(AGG_FILTER)
-                .subAggregation(
-                        AggregationBuilders.dateHistogram(AGG_HISTOGRAM)
-                                .field("timestamp")
-                                .subAggregation(AggregationBuilders.stats(AGG_STATS).field(field))
-                                .interval(interval.toESInterval())
-                )
+                .subAggregation(dateHistogramBuilder)
                 .filter(standardFilters(range, filter));
 
         QueryStringQueryBuilder qs = queryStringQuery(query);
@@ -491,140 +508,6 @@ public class Searches {
                 request.source(),
                 interval,
                 r.getTook());
-    }
-
-    /**
-     * <em>WARNING:</em> The name of that method is wrong and it returns the <em>newest</em> message of an index!
-     */
-    public SearchHit firstOfIndex(String index) {
-        return oneOfIndex(index, matchAllQuery(), SortOrder.DESC);
-    }
-
-    /**
-     * Find the oldest message timestamp in the given index.
-     *
-     * @param index Name of the index to query.
-     * @return the oldest message timestamp in the given index, or {@code null} if it couldn't be found.
-     */
-    public DateTime findOldestMessageTimestampOfIndex(String index) {
-        final FilterAggregationBuilder builder = AggregationBuilders.filter("agg")
-                .filter(FilterBuilders.existsFilter("timestamp"))
-                .subAggregation(AggregationBuilders.min("ts_min").field("timestamp"));
-        final SearchRequestBuilder srb = c.prepareSearch()
-                .setIndices(index)
-                .setSearchType(SearchType.COUNT)
-                .addAggregation(builder);
-
-        final SearchResponse response;
-        try {
-            response = c.search(srb.request()).actionGet();
-        } catch (IndexMissingException e) {
-            throw e;
-        } catch (ElasticsearchException e) {
-            LOG.error("Error while calculating oldest timestamp in index <" + index + ">", e);
-            return null;
-        }
-        esRequestTimer.update(response.getTookInMillis(), TimeUnit.MILLISECONDS);
-
-        final Filter f = response.getAggregations().get("agg");
-        if (f.getDocCount() == 0L) {
-            LOG.debug("No documents with attribute \"timestamp\" found in index <{}>", index);
-            return null;
-        }
-
-        final Min min = f.getAggregations().get("ts_min");
-        final String minTimeStamp = min.getValueAsString();
-        final DateTimeFormatter formatter = DateTimeFormat.forPattern(Tools.ES_DATE_FORMAT).withZoneUTC();
-
-        return formatter.parseDateTime(minTimeStamp);
-    }
-
-    /**
-     * Calculate stats (min, max, avg) about the message timestamps in the given index.
-     *
-     * @param index Name of the index to query.
-     * @return the timestamp stats in the given index, or {@code null} if they couldn't be calculated.
-     * @see org.elasticsearch.search.aggregations.metrics.stats.Stats
-     */
-    public TimestampStats timestampStatsOfIndex(String index) {
-        final FilterAggregationBuilder builder = AggregationBuilders.filter("agg")
-                .filter(FilterBuilders.existsFilter("timestamp"))
-                .subAggregation(AggregationBuilders.stats("ts_stats").field("timestamp"));
-        final SearchRequestBuilder srb = c.prepareSearch()
-                .setIndices(index)
-                .setSearchType(SearchType.COUNT)
-                .addAggregation(builder);
-
-        final SearchResponse response;
-        try {
-            response = c.search(srb.request()).actionGet();
-        } catch (IndexMissingException e) {
-            throw e;
-        } catch (ElasticsearchException e) {
-            LOG.error("Error while calculating timestamp stats in index <" + index + ">", e);
-            return null;
-        }
-        esRequestTimer.update(response.getTookInMillis(), TimeUnit.MILLISECONDS);
-
-        final Filter f = response.getAggregations().get("agg");
-        if (f.getDocCount() == 0L) {
-            LOG.debug("No documents with attribute \"timestamp\" found in index <{}>", index);
-            return null;
-        }
-
-        final Stats stats = f.getAggregations().get("ts_stats");
-        final DateTimeFormatter formatter = DateTimeFormat.forPattern(Tools.ES_DATE_FORMAT).withZoneUTC();
-        final DateTime min = formatter.parseDateTime(stats.getMinAsString());
-        final DateTime max = formatter.parseDateTime(stats.getMaxAsString());
-        final DateTime avg = formatter.parseDateTime(stats.getAvgAsString());
-
-        return TimestampStats.create(min, max, avg);
-    }
-
-    /**
-     * <em>WARNING:</em> The name of that method is wrong and it returns the <em>oldest</em> message of an index!
-     */
-    public SearchHit lastOfIndex(String index) {
-        return oneOfIndex(index, matchAllQuery(), SortOrder.ASC);
-    }
-
-    /**
-     * Find the newest message timestamp in the given index.
-     *
-     * @param index Name of the index to query.
-     * @return the youngest message timestamp in the given index, or {@code null} if it couldn't be found.
-     */
-    public DateTime findNewestMessageTimestampOfIndex(String index) {
-        final FilterAggregationBuilder builder = AggregationBuilders.filter("agg")
-                .filter(FilterBuilders.existsFilter("timestamp"))
-                .subAggregation(AggregationBuilders.max("ts_max").field("timestamp"));
-        final SearchRequestBuilder srb = c.prepareSearch()
-                .setIndices(index)
-                .setSearchType(SearchType.COUNT)
-                .addAggregation(builder);
-
-        final SearchResponse response;
-        try {
-            response = c.search(srb.request()).actionGet();
-        } catch (IndexMissingException e) {
-            throw e;
-        } catch (ElasticsearchException e) {
-            LOG.error("Error while calculating newest timestamp in index <" + index + ">", e);
-            return null;
-        }
-        esRequestTimer.update(response.getTookInMillis(), TimeUnit.MILLISECONDS);
-
-        final Filter f = response.getAggregations().get("agg");
-        if (f.getDocCount() == 0L) {
-            LOG.debug("No documents with attribute \"timestamp\" found in index <{}>", index);
-            return null;
-        }
-
-        final Max max = f.getAggregations().get("ts_max");
-        final String maxTimeStamp = max.getValueAsString();
-        final DateTimeFormatter formatter = DateTimeFormat.forPattern(Tools.ES_DATE_FORMAT).withZoneUTC();
-
-        return formatter.parseDateTime(maxTimeStamp);
     }
 
     private SearchRequestBuilder searchRequest(SearchesConfig config, Set<String> indices) {
@@ -708,10 +591,6 @@ public class Searches {
         }
 
         return srb;
-    }
-
-    private SearchRequestBuilder filteredSearchRequest(String query, String filter, Set<String> indices) {
-        return filteredSearchRequest(query, filter, indices, 0, 0, null, null);
     }
 
     private SearchRequestBuilder filteredSearchRequest(String query, String filter, Set<String> indices, TimeRange range) {

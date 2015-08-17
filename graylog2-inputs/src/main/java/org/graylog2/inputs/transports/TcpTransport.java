@@ -36,6 +36,7 @@ import org.graylog2.plugin.inputs.transports.AbstractTcpTransport;
 import org.graylog2.plugin.inputs.transports.Transport;
 import org.graylog2.plugin.inputs.util.ConnectionCounter;
 import org.graylog2.plugin.inputs.util.ThroughputCounter;
+import org.jboss.netty.bootstrap.Bootstrap;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.channel.ChannelHandler;
 import org.jboss.netty.handler.codec.frame.DelimiterBasedFrameDecoder;
@@ -60,21 +61,13 @@ import static org.jboss.netty.handler.codec.frame.Delimiters.lineDelimiter;
 import static org.jboss.netty.handler.codec.frame.Delimiters.nulDelimiter;
 
 public class TcpTransport extends AbstractTcpTransport {
-    private static final Logger LOG = LoggerFactory.getLogger(TcpTransport.class);
-
     public static final String CK_USE_NULL_DELIMITER = "use_null_delimiter";
-    public static final String CK_MAX_MESSAGE_SIZE = "max_message_size";
-    public static final String CK_TLS_CERT_FILE = "tls_cert_file";
-    public static final String CK_TLS_KEY_FILE = "tls_key_file";
-    public static final String CK_TLS_ENABLE = "tls_enable";
-    public static final String CK_TLS_KEY_PASSWORD = "tls_key_password";
+    private static final String CK_MAX_MESSAGE_SIZE = "max_message_size";
+    private static final String CK_TCP_KEEPALIVE = "tcp_keepalive";
+
     protected final ChannelBuffer[] delimiter;
     protected final int maxFrameLength;
-    private final boolean tlsEnable;
-    private final String tlsKeyPassword;
-    private final Configuration configuration;
-    private File tlsCertFile;
-    private File tlsKeyFile;
+    private final boolean tcpKeepalive;
 
     @AssistedInject
     public TcpTransport(@Assisted Configuration configuration,
@@ -88,7 +81,6 @@ public class TcpTransport extends AbstractTcpTransport {
                 throughputCounter,
                 connectionCounter,
                 localRegistry);
-
     }
 
     protected TcpTransport(final Configuration configuration,
@@ -98,28 +90,11 @@ public class TcpTransport extends AbstractTcpTransport {
                            final ConnectionCounter connectionCounter,
                            final LocalMetricRegistry localRegistry) {
         super(configuration, throughputCounter, localRegistry, bossPool, workerPool, connectionCounter);
-        this.configuration = configuration;
 
         final boolean nulDelimiter = configuration.getBoolean(CK_USE_NULL_DELIMITER);
         this.delimiter = nulDelimiter ? nulDelimiter() : lineDelimiter();
-        this.tlsEnable = configuration.getBoolean(CK_TLS_ENABLE);
-        this.tlsCertFile = getTlsFile(configuration, CK_TLS_CERT_FILE);
-        this.tlsKeyFile = getTlsFile(configuration, CK_TLS_KEY_FILE);
-        this.tlsKeyPassword = configuration.getString(CK_TLS_KEY_PASSWORD);
-
-        if (configuration.intIsSet(CK_MAX_MESSAGE_SIZE)) {
-            maxFrameLength = configuration.getInt(CK_MAX_MESSAGE_SIZE);
-        } else {
-            maxFrameLength = Config.DEFAULT_MAX_FRAME_LENGTH;
-        }
-    }
-
-    private File getTlsFile(Configuration configuration, String configKey) {
-        if (configuration.stringIsSet(configKey)) {
-            return new File(configuration.getString(configKey));
-        } else {
-            return new File("");
-        }
+        this.tcpKeepalive = configuration.getBoolean(CK_TCP_KEEPALIVE);
+        this.maxFrameLength = configuration.getInt(CK_MAX_MESSAGE_SIZE, Config.DEFAULT_MAX_FRAME_LENGTH);
     }
 
     private static Executor executorService(final String executorName, final String threadNameFormat, final MetricRegistry metricRegistry) {
@@ -131,54 +106,11 @@ public class TcpTransport extends AbstractTcpTransport {
     }
 
     @Override
-    protected LinkedHashMap<String, Callable<? extends ChannelHandler>> getBaseChannelHandlers(final MessageInput input) {
-        final LinkedHashMap<String, Callable<? extends ChannelHandler>> baseChannelHandlers = super.getBaseChannelHandlers(input);
+    protected Bootstrap getBootstrap() {
+        final Bootstrap bootstrap = super.getBootstrap();
+        bootstrap.setOption("child.keepAlive", tcpKeepalive);
 
-        if (!tlsEnable) {
-            return baseChannelHandlers;
-        }
-
-        final LinkedHashMap<String, Callable<? extends ChannelHandler>> handlerList = Maps.newLinkedHashMap();
-
-        LOG.info("Enabling TLS for input [{}/{}]. key-file=\"{}\" cert-file=\"{}\"", input.getName(), input.getId(), tlsKeyFile.toString(), tlsCertFile.toString());
-
-        if (!tlsCertFile.exists() || !tlsKeyFile.exists()) {
-            LOG.warn("TLS key file or certificate file does not exist, creating a self-signed certificate for input [{}/{}].", input.getName(), input.getId());
-
-            final SelfSignedCertificate ssc;
-            try {
-                ssc = new SelfSignedCertificate(configuration.getString(CK_BIND_ADDRESS) + ":" + configuration.getString(CK_PORT));
-                tlsCertFile = ssc.certificate();
-                tlsKeyFile = ssc.privateKey();
-            } catch (CertificateException e) {
-                LOG.error(String.format("Problem creating a self-signed certificate for input [%s/%s].", input.getName(), input.getId()), e);
-                return baseChannelHandlers;
-            }
-        }
-
-        if (tlsCertFile.exists() && tlsKeyFile.exists()) {
-            handlerList.put("tls", buildSslHandlerCallable());
-        }
-
-        handlerList.putAll(baseChannelHandlers);
-
-        return handlerList;
-    }
-
-    private Callable<ChannelHandler> buildSslHandlerCallable() {
-        return new Callable<ChannelHandler>() {
-            @Override
-            public ChannelHandler call() throws Exception {
-                try {
-                    final SslContext sslCtx = SslContext.newServerContext(tlsCertFile, tlsKeyFile, emptyToNull(tlsKeyPassword));
-
-                    return sslCtx.newHandler();
-                } catch (SSLException e) {
-                    LOG.error("Error creating SSL context. Make sure the certificate and key are in the correct format. cert=X.509 key=PKCS#8");
-                    throw e;
-                }
-            }
-        };
+        return bootstrap;
     }
 
     @Override
@@ -232,39 +164,11 @@ public class TcpTransport extends AbstractTcpTransport {
                     )
             );
             x.addField(
-                    new TextField(
-                            CK_TLS_CERT_FILE,
-                            "TLS cert file",
-                            "",
-                            "Path to the TLS certificate file",
-                            ConfigurationField.Optional.OPTIONAL
-                    )
-            );
-            x.addField(
-                    new TextField(
-                            CK_TLS_KEY_FILE,
-                            "TLS private key file",
-                            "",
-                            "Path to the TLS private key file",
-                            ConfigurationField.Optional.OPTIONAL
-                    )
-            );
-            x.addField(
                     new BooleanField(
-                            CK_TLS_ENABLE,
-                            "Enable TLS",
+                            CK_TCP_KEEPALIVE,
+                            "TCP keepalive",
                             false,
-                            "Accept TLS connections"
-                    )
-            );
-            x.addField(
-                    new TextField(
-                            CK_TLS_KEY_PASSWORD,
-                            "TLS key password",
-                            "",
-                            "The password for the encrypted key file.",
-                            ConfigurationField.Optional.OPTIONAL,
-                            TextField.Attribute.IS_PASSWORD
+                            "Enable TCP keepalive packets"
                     )
             );
 

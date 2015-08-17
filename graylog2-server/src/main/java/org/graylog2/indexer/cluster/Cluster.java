@@ -16,6 +16,7 @@
  */
 package org.graylog2.indexer.cluster;
 
+import com.github.joschi.jadconfig.util.Duration;
 import com.google.common.collect.Lists;
 import org.elasticsearch.ElasticsearchException;
 import org.elasticsearch.action.admin.cluster.health.ClusterHealthRequest;
@@ -40,6 +41,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Singleton
@@ -48,14 +50,19 @@ public class Cluster {
 
     private final Client c;
     private final Deflector deflector;
+    private final ScheduledExecutorService scheduler;
+    private final Duration requestTimeout;
     private final AtomicReference<Map<String, DiscoveryNode>> nodes = new AtomicReference<>();
-    private ScheduledExecutorService scheduler;
 
     @Inject
-    public Cluster(Client client, Deflector deflector, @Named("daemonScheduler") ScheduledExecutorService scheduler) {
+    public Cluster(Client client,
+                   Deflector deflector,
+                   @Named("daemonScheduler") ScheduledExecutorService scheduler,
+                   @Named("elasticsearch_request_timeout") Duration requestTimeout) {
         this.scheduler = scheduler;
         this.c = client;
         this.deflector = deflector;
+        this.requestTimeout = requestTimeout;
         // unfortunately we can't use guice here, because elasticsearch and graylog2 use different injectors and we can't
         // get to the instance to bridge.
         ClusterStateMonitor.setCluster(this);
@@ -119,28 +126,32 @@ public class Cluster {
     }
 
     /**
-     * Check if the Elasticsearch {@link org.elasticsearch.node.Node} is connected and that the cluster health status
-     * is not {@link ClusterHealthStatus#RED} and that the {@link org.graylog2.indexer.Deflector#isUp() deflector is up}.
+     * Check if the Elasticsearch {@link org.elasticsearch.node.Node} is connected and that there are other nodes
+     * in the cluster.
      *
-     * @return {@code true} if the Elasticsearch client is up and the cluster is healthy and the deflector is up, {@code false} otherwise
+     * @return {@code true} if the Elasticsearch client is up and the cluster contains other nodes, {@code false} otherwise
      */
-    public boolean isConnectedAndHealthy() {
+    public boolean isConnected() {
         Map<String, DiscoveryNode> nodeMap = nodes.get();
-        if (nodeMap == null || nodeMap.isEmpty()) {
-            return false;
-        }
-        if (!deflector.isUp()) {
-            return false;
-        }
+        return nodeMap != null && !nodeMap.isEmpty();
+    }
+
+    /**
+     * Check if the cluster health status is not {@link ClusterHealthStatus#RED} and that the
+     * {@link org.graylog2.indexer.Deflector#isUp() deflector is up}.
+     *
+     * @return {@code true} if the the cluster is healthy and the deflector is up, {@code false} otherwise
+     */
+    public boolean isHealthy() {
         try {
-            return health().getStatus() != ClusterHealthStatus.RED;
+            return health().getStatus() != ClusterHealthStatus.RED && deflector.isUp();
         } catch (ElasticsearchException e) {
             LOG.trace("Couldn't determine Elasticsearch health properly", e);
             return false;
         }
     }
 
-    public void waitForConnectedAndHealthy() throws InterruptedException {
+    public void waitForConnectedAndHealthy(long timeout, TimeUnit unit) throws InterruptedException, TimeoutException {
         LOG.debug("Waiting until cluster connection comes back and cluster is healthy, checking once per second.");
 
         final CountDownLatch latch = new CountDownLatch(1);
@@ -148,7 +159,7 @@ public class Cluster {
             @Override
             public void run() {
                 try {
-                    if (isConnectedAndHealthy()) {
+                    if (isConnected() && isHealthy()) {
                         LOG.debug("Cluster is healthy again, unblocking waiting threads.");
                         latch.countDown();
                     }
@@ -156,8 +167,16 @@ public class Cluster {
             }
         }, 0, 1, TimeUnit.SECONDS); // TODO should this be configurable?
 
-        latch.await();
+        final boolean waitSuccess = latch.await(timeout, unit);
         scheduledFuture.cancel(true); // Make sure to cancel the task to avoid task leaks!
+
+        if(!waitSuccess) {
+            throw new TimeoutException("Elasticsearch cluster didn't get healthy within timeout");
+        }
+    }
+
+    public void waitForConnectedAndHealthy() throws InterruptedException, TimeoutException {
+        waitForConnectedAndHealthy(requestTimeout.getQuantity(), requestTimeout.getUnit());
     }
 
     public void updateDataNodeList(Map<String, DiscoveryNode> nodes) {

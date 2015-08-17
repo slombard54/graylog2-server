@@ -14,25 +14,24 @@
  * You should have received a copy of the GNU General Public License
  * along with Graylog.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.graylog2.rest.resources.system.responses;
+package org.graylog2.rest.models.alarmcallbacks;
 
 import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.auto.value.AutoValue;
-import org.graylog2.indexer.ranges.IndexRange;
 
-import java.util.List;
-
-@JsonAutoDetect
 @AutoValue
-public abstract class IndexRangesResponse {
-    @JsonProperty
-    public abstract int total();
+@JsonAutoDetect
+public abstract class AlarmCallbackError extends AlarmCallbackResult {
+    @JsonProperty("type")
+    public String type() { return "error"; }
 
-    @JsonProperty
-    public abstract List<IndexRange> ranges();
+    @JsonProperty("error")
+    public abstract String error();
 
-    public static IndexRangesResponse create(int total, List<IndexRange> ranges) {
-        return new AutoValue_IndexRangesResponse(total, ranges);
+    @JsonCreator
+    public static AlarmCallbackError create(@JsonProperty("error") String error) {
+        return new AutoValue_AlarmCallbackError(error);
     }
 }

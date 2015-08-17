@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit;
 
 public class Buffers {
     private static final Logger LOG = LoggerFactory.getLogger(Buffers.class);
-    private static final long DEFAULT_MAX_WAIT = 30l;
+    private static final long DEFAULT_MAX_WAIT = 30L;
 
     private final ProcessBuffer processBuffer;
     private final OutputBuffer outputBuffer;
@@ -66,7 +66,7 @@ public class Buffers {
         final Retryer<Boolean> retryer = RetryerBuilder.<Boolean>newBuilder()
                 .retryIfResult(Predicates.not(Predicates.equalTo(Boolean.TRUE)))
                 .withWaitStrategy(WaitStrategies.fixedWait(1, TimeUnit.SECONDS))
-                .withStopStrategy(StopStrategies.stopAfterDelay(timeUnit.toMillis(maxWait)))
+                .withStopStrategy(StopStrategies.stopAfterDelay(maxWait, timeUnit))
                 .build();
 
         try {

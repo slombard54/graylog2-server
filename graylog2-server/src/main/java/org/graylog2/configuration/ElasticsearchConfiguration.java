@@ -120,9 +120,6 @@ public class ElasticsearchConfiguration {
     @Parameter(value = "index_optimization_max_num_segments", validator = PositiveIntegerValidator.class)
     private int indexOptimizationMaxNumSegments = 1;
 
-    @Parameter(value = "elasticsearch_store_timestamps_as_doc_values")
-    private boolean storeTimestampsAsDocValues = true;
-
     @Parameter(value = "elasticsearch_request_timeout", validator = PositiveDurationValidator.class)
     private Duration requestTimeout = Duration.minutes(1L);
 
@@ -191,7 +188,7 @@ public class ElasticsearchConfiguration {
     }
 
     public String getIndexPrefix() {
-        return indexPrefix;
+        return indexPrefix.toLowerCase();
     }
 
     public int getMaxNumberOfIndices() {
@@ -252,10 +249,6 @@ public class ElasticsearchConfiguration {
 
     public String getPathData() {
         return pathData;
-    }
-
-    public boolean isStoreTimestampsAsDocValues() {
-        return storeTimestampsAsDocValues;
     }
 
     public Duration getRequestTimeout() {

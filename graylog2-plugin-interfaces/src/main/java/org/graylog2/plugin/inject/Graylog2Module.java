@@ -22,11 +22,14 @@
  */
 package org.graylog2.plugin.inject;
 
+import com.google.common.util.concurrent.Service;
 import com.google.inject.AbstractModule;
 import com.google.inject.Key;
 import com.google.inject.TypeLiteral;
 import com.google.inject.assistedinject.FactoryModuleBuilder;
 import com.google.inject.multibindings.MapBinder;
+import com.google.inject.multibindings.Multibinder;
+import com.google.inject.name.Names;
 import org.graylog2.plugin.inputs.MessageInput;
 import org.graylog2.plugin.inputs.annotations.ConfigClass;
 import org.graylog2.plugin.inputs.annotations.FactoryClass;
@@ -36,7 +39,11 @@ import org.graylog2.plugin.outputs.MessageOutput;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
+import javax.ws.rs.container.ContainerResponseFilter;
+import javax.ws.rs.container.DynamicFeature;
+import javax.ws.rs.ext.ExceptionMapper;
 import java.lang.annotation.Annotation;
 
 public abstract class Graylog2Module extends AbstractModule {
@@ -228,4 +235,34 @@ public abstract class Graylog2Module extends AbstractModule {
 
         installOutput(outputMapBinder, target, factoryClass);
     }
+
+    @Nonnull
+    protected Multibinder<Class<? extends DynamicFeature>> jerseyDynamicFeatureBinder() {
+        return Multibinder.newSetBinder(binder(), new DynamicFeatureType());
+    }
+
+    @Nonnull
+    protected Multibinder<Class<? extends ContainerResponseFilter>> jerseyContainerResponseFilterBinder() {
+        return Multibinder.newSetBinder(binder(), new ContainerResponseFilterType());
+    }
+
+    @Nonnull
+    protected Multibinder<Class<? extends ExceptionMapper>> jerseyExceptionMapperBinder() {
+        return Multibinder.newSetBinder(binder(), new ExceptionMapperType());
+    }
+
+    @Nonnull
+    protected Multibinder<Class> jerseyAdditionalComponentsBinder() {
+        return Multibinder.newSetBinder(binder(), Class.class, Names.named("additionalJerseyComponents"));
+    }
+
+    protected Multibinder<Service> serviceBinder() {
+        return Multibinder.newSetBinder(binder(), Service.class);
+    }
+
+    private static class DynamicFeatureType extends TypeLiteral<Class<? extends DynamicFeature>> {}
+
+    private static class ContainerResponseFilterType extends TypeLiteral<Class<? extends ContainerResponseFilter>> {}
+
+    private static class ExceptionMapperType extends TypeLiteral<Class<? extends ExceptionMapper>> {}
 }

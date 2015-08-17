@@ -37,12 +37,12 @@ import com.ning.http.client.AsyncHttpClient;
 import com.ning.http.client.AsyncHttpClientConfig;
 import com.ning.http.client.FluentCaseInsensitiveStringsMap;
 import com.ning.http.client.ListenableFuture;
-import com.ning.http.client.PerRequestConfig;
 import com.ning.http.client.Realm;
 import com.ning.http.client.Request;
 import com.ning.http.client.Response;
 import com.ning.http.client.listener.TransferCompletionHandler;
 import com.ning.http.client.listener.TransferListener;
+import com.squareup.okhttp.HttpUrl;
 import org.graylog2.restclient.models.ClusterEntity;
 import org.graylog2.restclient.models.Node;
 import org.graylog2.restclient.models.Radio;
@@ -56,13 +56,10 @@ import org.slf4j.LoggerFactory;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
-import javax.ws.rs.core.UriBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.MalformedURLException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -92,12 +89,12 @@ class ApiClientImpl implements ApiClient {
     @Inject
     private ApiClientImpl(ServerNodes serverNodes, @Named("Default Timeout") Long defaultTimeout) {
         this(serverNodes, defaultTimeout,
-             new ObjectMapper()
-                     .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES)
-                     .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-                     .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
-                     .registerModule(new GuavaModule())
-                     .registerModule(new JodaModule()));
+                new ObjectMapper()
+                        .setPropertyNamingStrategy(PropertyNamingStrategy.CAMEL_CASE_TO_LOWER_CASE_WITH_UNDERSCORES)
+                        .disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
+                        .setVisibility(PropertyAccessor.FIELD, JsonAutoDetect.Visibility.ANY)
+                        .registerModule(new GuavaModule())
+                        .registerModule(new JodaModule()));
     }
 
     private ApiClientImpl(ServerNodes serverNodes, Long defaultTimeout, ObjectMapper objectMapper) {
@@ -109,7 +106,7 @@ class ApiClientImpl implements ApiClient {
     @Override
     public void start() {
         AsyncHttpClientConfig.Builder builder = new AsyncHttpClientConfig.Builder();
-        builder.setAllowPoolingConnection(false);
+        builder.setAllowPoolingConnections(false);
         builder.setUserAgent("graylog2-web/" + Version.VERSION);
         client = new AsyncHttpClient(builder.build());
 
@@ -603,7 +600,7 @@ class ApiClientImpl implements ApiClient {
                 final ListenableFuture<Response> future = context.listenableFuture;
                 try {
                     final Response response = future.get(timeoutValue, timeoutUnit);
-                    if(response == null) {
+                    if (response == null) {
                         LOG.error("Didn't receive response from node {}", node);
                         node.markFailure();
                         continue;
@@ -638,31 +635,31 @@ class ApiClientImpl implements ApiClient {
             final AsyncHttpClient.BoundRequestBuilder requestBuilder;
             final String userInfo = url.getUserInfo();
             // have to hack around here, because the userInfo will unescape the @ in usernames :(
-            try {
-                url = UriBuilder.fromUri(url.toURI()).userInfo(null).build().toURL();
-            } catch (URISyntaxException | MalformedURLException ignore) {
-                // cannot happen, because it was a valid url before
-            }
+            final HttpUrl httpUrl = HttpUrl.get(url)
+                    .newBuilder()
+                    .username("")
+                    .password("")
+                    .build();
 
             switch (method) {
                 case GET:
-                    requestBuilder = client.prepareGet(url.toString());
+                    requestBuilder = client.prepareGet(httpUrl.toString());
                     break;
                 case POST:
-                    requestBuilder = client.preparePost(url.toString());
+                    requestBuilder = client.preparePost(httpUrl.toString());
                     break;
                 case PUT:
-                    requestBuilder = client.preparePut(url.toString());
+                    requestBuilder = client.preparePut(httpUrl.toString());
                     break;
                 case DELETE:
-                    requestBuilder = client.prepareDelete(url.toString());
+                    requestBuilder = client.prepareDelete(httpUrl.toString());
                     break;
                 default:
                     throw new IllegalStateException("Illegal method " + method.toString());
             }
 
             applyBasicAuthentication(requestBuilder, userInfo);
-            requestBuilder.setPerRequestConfig(new PerRequestConfig(null, (int) timeoutUnit.toMillis(timeoutValue)));
+            requestBuilder.setRequestTimeout((int) timeoutUnit.toMillis(timeoutValue));
 
             if (body != null) {
                 if (method != Method.PUT && method != Method.POST) {
@@ -696,7 +693,7 @@ class ApiClientImpl implements ApiClient {
             // if this is null there's not much we can do anyway...
             Preconditions.checkNotNull(pathTemplate, "path() needs to be set to a non-null value.");
 
-            URI builtUrl;
+            HttpUrl builtUrl;
             try {
                 String path;
                 if (pathParams.isEmpty()) {
@@ -704,16 +701,14 @@ class ApiClientImpl implements ApiClient {
                 } else {
                     path = MessageFormat.format(pathTemplate, pathParams.toArray());
                 }
-                final UriBuilder uriBuilder = UriBuilder.fromUri(target.getTransportAddress());
-                uriBuilder.path(path);
+
+                final HttpUrl.Builder builder = HttpUrl.parse(target.getTransportAddress())
+                        .newBuilder()
+                        .encodedPath(path);
+
                 for (String key : queryParams.keySet()) {
                     for (String value : queryParams.get(key)) {
-                        // Jersey's UriBuilderImpl doesn't encode double quotes, which is correct per RFC 3986
-                        // (http://tools.ietf.org/html/rfc3986#section-3.4), but causes problems down the stack,
-                        // see https://github.com/Graylog2/graylog2-server/issues/793
-                        // So we fall back manually encoding double quotes right now because URLEncoder.encode does
-                        // too much and we'd end up with partially double encoded URIs. F... my life.
-                        uriBuilder.queryParam(key, value.replace("\"", "%22"));
+                        builder.addQueryParameter(key, value);
                     }
                 }
 
@@ -722,13 +717,15 @@ class ApiClientImpl implements ApiClient {
                 }
                 if (sessionId != null) {
                     // pass the current session id via basic auth and special "password"
-                    uriBuilder.userInfo(sessionId + ":session");
+                    builder.username(sessionId);
+                    builder.password("session");
                 }
-                builtUrl = uriBuilder.build();
-                return builtUrl.toURL();
-            } catch (MalformedURLException e) {
+
+                builtUrl = builder.build();
+                return builtUrl.url();
+            } catch (RuntimeException e) {
                 LOG.error("Could not build target URL", e);
-                throw new RuntimeException(e);
+                throw e;
             }
         }
 
@@ -779,13 +776,12 @@ class ApiClientImpl implements ApiClient {
                     }
 
                     @Override
-                    public void onBytesReceived(ByteBuffer buffer) throws IOException {
-                        stream.putBuffer(buffer);
+                    public void onBytesSent(long amount, long current, long total) {
                     }
 
                     @Override
-                    public void onBytesSent(ByteBuffer buffer) {
-
+                    public void onBytesReceived(byte[] bytes) throws IOException {
+                        stream.putBuffer(ByteBuffer.wrap(bytes));
                     }
 
                     @Override
@@ -799,10 +795,7 @@ class ApiClientImpl implements ApiClient {
                     }
                 }));
                 return stream;
-            } catch (MalformedURLException e) {
-                LOG.error("Malformed URL", e);
-                throw new RuntimeException("Malformed URL.", e);
-            } catch (IOException e) {
+            } catch (Exception e) {
                 LOG.error("unhandled IOException", rootCause(e));
                 target.markFailure();
                 throw e;

@@ -16,18 +16,44 @@
  */
 package org.graylog2.indexer.ranges;
 
-import org.graylog2.plugin.database.Persisted;
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.google.auto.value.AutoValue;
 import org.joda.time.DateTime;
 
-/**
- * @author Dennis Oelkers <dennis@torch.sh>
- */
-public interface IndexRange extends Persisted {
-    String getIndexName();
+import java.util.Comparator;
 
-    DateTime getCalculatedAt();
+@AutoValue
+@JsonAutoDetect
+public abstract class IndexRange {
+    public static final String PREFIX = "gl2_index_range_";
+    public static final String FIELD_TOOK_MS = PREFIX + "took_ms";
+    public static final String FIELD_CALCULATED_AT = PREFIX + "calculated_at";
+    public static final String FIELD_END = PREFIX + "end";
+    public static final String FIELD_BEGIN = PREFIX + "begin";
+    public static final String FIELD_INDEX_NAME = PREFIX + "index_name";
+    public static final Comparator<IndexRange> COMPARATOR = new IndexRangeComparator();
 
-    DateTime getStart();
+    @JsonProperty(FIELD_INDEX_NAME)
+    public abstract String indexName();
 
-    int getCalculationTookMs();
+    @JsonProperty(FIELD_BEGIN)
+    public abstract DateTime begin();
+
+    @JsonProperty(FIELD_END)
+    public abstract DateTime end();
+
+    @JsonProperty(FIELD_CALCULATED_AT)
+    public abstract DateTime calculatedAt();
+
+    @JsonProperty(FIELD_TOOK_MS)
+    public abstract int calculationDuration();
+
+    public static IndexRange create(String indexName,
+                                    DateTime begin,
+                                    DateTime end,
+                                    DateTime calculatedAt,
+                                    int calculationDuration) {
+        return new AutoValue_IndexRange(indexName, begin, end, calculatedAt, calculationDuration);
+    }
 }
